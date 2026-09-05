@@ -43,9 +43,12 @@ class Settings(BaseSettings):
     EMBEDDING_DIMENSION: int = Field(default=768)
 
     # Security
-    JWT_SECRET: str = Field(default="dev_secret_key_change_in_production")
+    JWT_SECRET: str = Field(default="dev_secret_key_campuslink_2026")
     JWT_ALGORITHM: str = Field(default="HS256")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=115200)
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30)
+    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7)
+    COOKIE_SECURE: bool = Field(default=False)
+    COOKIE_SAMESITE: str = Field(default="lax")
 
 
 settings = Settings()

@@ -3,29 +3,39 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
-import { Eye, EyeOff, Lock, Mail, AlertCircle, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail, UserCheck, AlertCircle, Loader2 } from "lucide-react";
 
-export default function LoginPage() {
-  const { login } = useAuth();
+export default function RegisterPage() {
+  const { register } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [role, setRole] = useState<"STUDENT" | "FACULTY" | "ALUMNI">("STUDENT");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      setError("Please fill in both email and password.");
+    if (!email || !password || !confirmPassword) {
+      setError("All fields are required.");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters long.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
       return;
     }
 
     try {
       setError(null);
       setLoading(true);
-      await login(email, password);
+      await register(email, password, role);
     } catch (err: any) {
-      setError(err?.message || "Failed to log in. Please check your credentials.");
+      setError(err?.message || "Registration failed. Please check your details.");
     } finally {
       setLoading(false);
     }
@@ -39,10 +49,10 @@ export default function LoginPage() {
             CampusLink AI
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-50">
-            Sign in to your account
+            Create an Account
           </h1>
           <p className="text-sm text-slate-400">
-            Discover evidence-backed campus expertise and knowledge
+            Join your campus knowledge and expertise network
           </p>
         </div>
 
@@ -65,9 +75,31 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="student@campuslink.edu"
+                placeholder="your.email@campuslink.edu"
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm transition"
               />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
+              Campus Role
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {(["STUDENT", "FACULTY", "ALUMNI"] as const).map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRole(r)}
+                  className={`py-2 px-3 rounded-xl text-xs font-semibold uppercase tracking-wider border transition ${
+                    role === r
+                      ? "bg-sky-600 border-sky-500 text-white shadow-sm"
+                      : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
+                  }`}
+                >
+                  {r.toLowerCase()}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -82,7 +114,7 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="Min. 8 characters"
                 className="w-full pl-10 pr-11 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm transition"
               />
               <button
@@ -95,6 +127,23 @@ export default function LoginPage() {
             </div>
           </div>
 
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
+              Confirm Password
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
+              <input
+                type={showPassword ? "text" : "password"}
+                required
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Re-enter password"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm transition"
+              />
+            </div>
+          </div>
+
           <button
             type="submit"
             disabled={loading}
@@ -103,18 +152,18 @@ export default function LoginPage() {
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                Signing in...
+                Creating account...
               </>
             ) : (
-              "Sign In"
+              "Register Account"
             )}
           </button>
         </form>
 
         <div className="pt-4 text-center text-xs text-slate-500 border-t border-slate-800/80">
-          Don't have an account?{" "}
-          <Link href="/register" className="font-semibold text-sky-400 hover:text-sky-300 transition">
-            Register here
+          Already have an account?{" "}
+          <Link href="/login" className="font-semibold text-sky-400 hover:text-sky-300 transition">
+            Sign in here
           </Link>
         </div>
       </div>
