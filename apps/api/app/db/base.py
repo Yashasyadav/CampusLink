@@ -1,7 +1,4 @@
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from datetime import datetime
+from app.models.base import Base
+import app.models  # Import all models to ensure metadata registration
 
-
-class Base(DeclarativeBase):
-    """Base class for all SQLAlchemy declarative models (Phase 2 Roadmap)."""
-    pass
+__all__ = ["Base"]

@@ -29,7 +29,7 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: Optional[str] = Field(
-        default="postgresql+asyncpg://campuslink:campuslink_dev_pass@localhost:5432/campuslink_db"
+        default="postgresql+psycopg://campuslink:campuslink_dev_pass@localhost:5433/campuslink_db"
     )
 
     # AI & LLM Provider

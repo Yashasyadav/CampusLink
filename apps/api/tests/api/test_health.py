@@ -5,7 +5,10 @@ client = TestClient(app)
 
 
 def test_health_check_returns_ok():
-    """Verify GET /health returns status 200 and {'status': 'ok'}."""
+    """Verify GET /health returns status 200, healthy database, and available pgvector."""
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["database"] == "healthy"
+    assert data["pgvector"] == "available"

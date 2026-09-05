@@ -88,7 +88,20 @@ CampusLink AI is constructed using a disciplined phase-by-phase roadmap:
 cp .env.example .env
 ```
 
-### 2. Run Backend API
+### 2. Start PostgreSQL Container (Port 5433)
+
+CampusLink PostgreSQL runs in Docker on **host port 5433** (keeping any local Windows PostgreSQL on 5432 untouched):
+
+```bash
+docker compose up -d db
+```
+
+Verify container status:
+```bash
+docker compose ps
+```
+
+### 3. Run Backend API & Apply Migrations
 
 ```bash
 cd apps/api
@@ -99,11 +112,17 @@ python -m venv .venv
 source .venv/bin/activate
 
 pip install -r requirements.txt
+
+# Run database migrations & seed synthetic data
+alembic upgrade head
+python -m app.db.seed
+
+# Run API server
 uvicorn app.main:app --reload --port 8000
 ```
 
-Verify backend health check:
-`GET http://localhost:8000/health` -> `{"status": "ok"}`
+Verify backend health check (with DB & pgvector status):
+`GET http://localhost:8000/health` -> `{"status": "ok", "database": "healthy", "pgvector": "available"}`
 
 ### 3. Run Frontend Web App
 
