@@ -1,0 +1,54 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: campuslink_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-campuslink}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-campuslink_dev_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-campuslink_db}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-campuslink} -d ${POSTGRES_DB:-campuslink_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.api
+    container_name: campuslink_api
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-campuslink}:${POSTGRES_PASSWORD:-campuslink_dev_pass}@db:5432/${POSTGRES_DB:-campuslink_db}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./apps/api:/app/apps/api
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.web
+    container_name: campuslink_web
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - api
+    volumes:
+      - ./apps/web:/app/apps/web
+
+volumes:
+  postgres_data:
