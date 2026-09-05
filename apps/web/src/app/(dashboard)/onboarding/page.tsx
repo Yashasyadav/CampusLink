@@ -254,23 +254,23 @@ function OnboardingContent() {
           </div>
         )}
 
-        {/* Step 4: Resume Requirement Notice */}
+        {/* Step 4: Resume & Document Intelligence */}
         {step === 4 && (
           <div className="bg-slate-900/80 p-8 rounded-2xl border border-slate-800 space-y-6">
             <div>
-              <h2 className="text-xl font-bold text-slate-50">Step 4: Resume & Document Parsing</h2>
+              <h2 className="text-xl font-bold text-slate-50">Step 4: Resume & Document Intelligence</h2>
               <p className="text-sm text-slate-400">
-                Next required onboarding step for student expertise verification.
+                Upload your PDF or DOCX resume for AI-powered skill extraction and project verification.
               </p>
             </div>
 
-            <div className="p-6 rounded-xl border border-amber-800/40 bg-amber-950/20 space-y-3 text-amber-200 text-sm">
-              <div className="flex items-center space-x-2 font-semibold text-amber-400">
+            <div className="p-6 rounded-xl border border-sky-800/40 bg-sky-950/20 space-y-3 text-sky-200 text-sm">
+              <div className="flex items-center space-x-2 font-semibold text-sky-400">
                 <FileText className="w-5 h-5" />
-                <span>Resume Processing — Coming in Phase 4</span>
+                <span>Gemini Document Intelligence Active</span>
               </div>
-              <p className="text-xs text-amber-300/80 leading-relaxed">
-                Actual PDF/DOCX resume upload, OCR, and AI extraction will be enabled in **Phase 4**. You may complete basic onboarding now and upload your resume in the next phase.
+              <p className="text-xs text-sky-300/80 leading-relaxed">
+                Upload your PDF or DOCX resume to automatically discover skills, research areas, and project experience with explicit evidence provenance.
               </p>
             </div>
 
@@ -282,10 +282,10 @@ function OnboardingContent() {
                 Back
               </button>
               <button
-                onClick={() => setStep(5)}
-                className="flex items-center py-2.5 px-6 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm rounded-xl"
+                onClick={() => router.push("/onboarding/resume")}
+                className="flex items-center py-2.5 px-6 bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm rounded-xl"
               >
-                Complete Onboarding
+                Upload & Process Resume <ArrowRight className="w-4 h-4 ml-2" />
               </button>
             </div>
           </div>

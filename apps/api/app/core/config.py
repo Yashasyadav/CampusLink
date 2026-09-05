@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str = Field(default="text-embedding-004")
     EMBEDDING_DIMENSION: int = Field(default=768)
 
+    # Document & Storage Settings
+    STORAGE_DIR: str = Field(default="storage/private/resumes")
+    MAX_RESUME_SIZE_MB: int = Field(default=10)
+    MAX_RESUME_SIZE_BYTES: int = Field(default=10 * 1024 * 1024)
+
     # Security
     JWT_SECRET: str = Field(default="dev_secret_key_campuslink_2026")
     JWT_ALGORITHM: str = Field(default="HS256")

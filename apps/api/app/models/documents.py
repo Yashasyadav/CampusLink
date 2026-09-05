@@ -25,6 +25,7 @@ class ProcessingStatus(str, enum.Enum):
     PROCESSED = "PROCESSED"
     FAILED = "FAILED"
     REVIEW_REQUIRED = "REVIEW_REQUIRED"
+    CONFIRMED = "CONFIRMED"
 
 
 class ExtractionStatus(str, enum.Enum):

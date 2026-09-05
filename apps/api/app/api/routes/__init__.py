@@ -8,6 +8,7 @@ from app.api.routes import (
     search,
     agents,
     connections,
+    documents,
 )
 
 api_router = APIRouter()
@@ -20,3 +21,4 @@ api_router.include_router(facilities.router)
 api_router.include_router(search.router)
 api_router.include_router(agents.router)
 api_router.include_router(connections.router)
+api_router.include_router(documents.router)

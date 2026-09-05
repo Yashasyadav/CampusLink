@@ -62,14 +62,31 @@ CampusLink_AI/
 
 CampusLink AI is constructed using a disciplined phase-by-phase roadmap:
 
-- **Phase 1 (Current)**: Enterprise Architecture & Foundation
-- **Phase 2**: Database Schema, Models & Alembic Migrations
-- **Phase 3**: Core Domain Services & Deterministic API Endpoints
-- **Phase 4**: Agentic Framework & LangGraph Workflow Integration
-- **Phase 5**: Frontend UI/UX Experience & Integration
-- **Phase 6**: Hardening, Security, Testing & Production Deployment
+- **Phase 1**: Enterprise Repository Architecture — COMPLETE
+- **Phase 2**: PostgreSQL 16 + `pgvector` Database & Alembic Migrations — COMPLETE
+- **Phase 3**: Authentication, Cookie Sessions & Profile Onboarding — COMPLETE
+- **Phase 4 (Current)**: Resume Intelligence & Document Processing — COMPLETE
+- **Phase 5**: Projects, Research, Facilities & Knowledge Discovery
+- **Phase 6**: Embeddings, Semantic Vector Search & AI Agent Orchestration
 
 ---
+
+## 🔑 AI & Gemini Configuration Setup
+
+To enable Google Gemini document intelligence for resume upload and structured parsing:
+
+1. Obtain an API key from [Google AI Studio](https://aistudio.google.com/).
+2. Add your key to `.env`:
+   ```ini
+   LLM_PROVIDER=gemini
+   GEMINI_API_KEY=your_gemini_api_key_here
+   GEMINI_MODEL=gemini-1.5-pro
+   STORAGE_DIR=storage/private/resumes
+   MAX_RESUME_SIZE_MB=10
+   ```
+> [!NOTE]
+> If `GEMINI_API_KEY` is not provided, backend services launch gracefully, reporting `gemini: "unconfigured"` on `GET /health`. Resume processing endpoints return safe non-crashing error responses.
+
 
 ## 📋 Local Prerequisites
 

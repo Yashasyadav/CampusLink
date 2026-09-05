@@ -60,11 +60,14 @@ async def health_check() -> HealthCheckResponse:
     except Exception:
         db_status = "disconnected"
 
+    gemini_status = "configured" if (settings.GEMINI_API_KEY and settings.GEMINI_API_KEY.strip()) else "unconfigured"
+
     return HealthCheckResponse(
         status="ok" if db_status == "healthy" else "degraded",
         database=db_status,
         pgvector=vector_status,
         postgres_version=pg_version,
+        gemini=gemini_status,
     )
 
 
