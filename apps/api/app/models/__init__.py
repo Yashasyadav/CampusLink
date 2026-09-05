@@ -7,6 +7,7 @@ from app.models.projects import (
     ProjectContributor,
     ProjectSkill,
     ProjectTechnology,
+    ProjectType,
     ProjectVisibility,
     ProjectStatus,
     ContributorRole,
@@ -18,15 +19,29 @@ from app.models.documents import (
     ProcessingStatus,
     ExtractionStatus,
 )
-from app.models.research import ResearchItem, ResearchStatus
+from app.models.research import (
+    ResearchItem,
+    ResearchAuthor,
+    ResearchStatus,
+    PublicationType,
+    ResearchVisibility,
+)
 from app.models.facilities import (
     Facility,
     Equipment,
     FacilityStatus,
     EquipmentStatus,
     AvailabilityStatus,
+    FacilityVisibility,
+    EquipmentVisibility,
 )
-from app.models.knowledge import ProblemSolution, KnowledgeVisibility
+from app.models.knowledge import (
+    ProblemSolution,
+    ProblemSolutionSkill,
+    ProblemSolutionTechnology,
+    ProblemSolutionStatus,
+    KnowledgeVisibility,
+)
 from app.models.embeddings import Embedding, EMBEDDING_DIMENSION
 from app.models.connections import Connection, ConnectionStatus
 from app.models.audit import AuditLog
@@ -47,6 +62,7 @@ __all__ = [
     "ProjectContributor",
     "ProjectSkill",
     "ProjectTechnology",
+    "ProjectType",
     "ProjectVisibility",
     "ProjectStatus",
     "ContributorRole",
@@ -56,13 +72,21 @@ __all__ = [
     "ProcessingStatus",
     "ExtractionStatus",
     "ResearchItem",
+    "ResearchAuthor",
     "ResearchStatus",
+    "PublicationType",
+    "ResearchVisibility",
     "Facility",
     "Equipment",
     "FacilityStatus",
     "EquipmentStatus",
     "AvailabilityStatus",
+    "FacilityVisibility",
+    "EquipmentVisibility",
     "ProblemSolution",
+    "ProblemSolutionSkill",
+    "ProblemSolutionTechnology",
+    "ProblemSolutionStatus",
     "KnowledgeVisibility",
     "Embedding",
     "EMBEDDING_DIMENSION",

@@ -22,6 +22,7 @@ export async function fetchApi<T>(
   };
 
   const response = await fetch(url, {
+    credentials: "include",
     ...options,
     headers,
   });

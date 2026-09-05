@@ -10,6 +10,18 @@ if TYPE_CHECKING:
     from app.models.users import User
 
 
+class FacilityVisibility(str, enum.Enum):
+    PUBLIC = "PUBLIC"
+    CAMPUS_ONLY = "CAMPUS_ONLY"
+    PRIVATE = "PRIVATE"
+
+
+class EquipmentVisibility(str, enum.Enum):
+    PUBLIC = "PUBLIC"
+    CAMPUS_ONLY = "CAMPUS_ONLY"
+    PRIVATE = "PRIVATE"
+
+
 class FacilityStatus(str, enum.Enum):
     OPERATIONAL = "OPERATIONAL"
     MAINTENANCE = "MAINTENANCE"
@@ -38,6 +50,9 @@ class Facility(Base, TimestampMixin):
     location: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     building: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     floor: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    department: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    contact_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    operating_hours: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     capabilities: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     responsible_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
@@ -49,6 +64,12 @@ class Facility(Base, TimestampMixin):
         nullable=False,
     )
     availability_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    visibility: Mapped[FacilityVisibility] = mapped_column(
+        Enum(FacilityVisibility, name="facility_visibility_enum", native_enum=False),
+        default=FacilityVisibility.CAMPUS_ONLY,
+        nullable=False,
+        index=True,
+    )
 
     # Relationships
     responsible_user: Mapped[Optional["User"]] = relationship("User")
@@ -74,12 +95,21 @@ class Equipment(Base, TimestampMixin):
         Enum(EquipmentStatus, name="equipment_status_enum", native_enum=False),
         default=EquipmentStatus.OPERATIONAL,
         nullable=False,
+        index=True,
     )
     availability_status: Mapped[AvailabilityStatus] = mapped_column(
         Enum(AvailabilityStatus, name="availability_status_enum", native_enum=False),
         default=AvailabilityStatus.AVAILABLE,
         nullable=False,
+        index=True,
+    )
+    visibility: Mapped[EquipmentVisibility] = mapped_column(
+        Enum(EquipmentVisibility, name="equipment_visibility_enum", native_enum=False),
+        default=EquipmentVisibility.CAMPUS_ONLY,
+        nullable=False,
+        index=True,
     )
 
     # Relationship
     facility: Mapped["Facility"] = relationship("Facility", back_populates="equipment")
+

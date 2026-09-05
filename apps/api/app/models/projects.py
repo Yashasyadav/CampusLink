@@ -13,6 +13,17 @@ if TYPE_CHECKING:
     from app.models.knowledge import ProblemSolution
 
 
+class ProjectType(str, enum.Enum):
+    ACADEMIC = "ACADEMIC"
+    CAPSTONE = "CAPSTONE"
+    HACKATHON = "HACKATHON"
+    RESEARCH = "RESEARCH"
+    PERSONAL = "PERSONAL"
+    CLUB = "CLUB"
+    DEPARTMENT = "DEPARTMENT"
+    OTHER = "OTHER"
+
+
 class ProjectVisibility(str, enum.Enum):
     PUBLIC = "PUBLIC"
     CAMPUS_ONLY = "CAMPUS_ONLY"
@@ -20,6 +31,7 @@ class ProjectVisibility(str, enum.Enum):
 
 
 class ProjectStatus(str, enum.Enum):
+    PLANNED = "PLANNED"
     PROPOSED = "PROPOSED"
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
@@ -28,9 +40,12 @@ class ProjectStatus(str, enum.Enum):
 
 class ContributorRole(str, enum.Enum):
     OWNER = "OWNER"
-    CONTRIBUTOR = "CONTRIBUTOR"
-    MENTOR = "MENTOR"
+    DEVELOPER = "DEVELOPER"
+    RESEARCHER = "RESEARCHER"
+    DESIGNER = "DESIGNER"
     FACULTY_GUIDE = "FACULTY_GUIDE"
+    MENTOR = "MENTOR"
+    CONTRIBUTOR = "CONTRIBUTOR"
 
 
 class Project(Base, TimestampMixin):
@@ -41,6 +56,12 @@ class Project(Base, TimestampMixin):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
+    project_type: Mapped[ProjectType] = mapped_column(
+        Enum(ProjectType, name="project_type_enum", native_enum=False),
+        default=ProjectType.ACADEMIC,
+        nullable=False,
+        index=True,
+    )
     domain: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
     problem_statement: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     methodology: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -49,12 +70,15 @@ class Project(Base, TimestampMixin):
         Enum(ProjectVisibility, name="project_visibility_enum", native_enum=False),
         default=ProjectVisibility.CAMPUS_ONLY,
         nullable=False,
+        index=True,
     )
     status: Mapped[ProjectStatus] = mapped_column(
         Enum(ProjectStatus, name="project_status_enum", native_enum=False),
         default=ProjectStatus.IN_PROGRESS,
         nullable=False,
+        index=True,
     )
+    provenance: Mapped[str] = mapped_column(String(50), default="MANUAL", nullable=False)
     start_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     github_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
