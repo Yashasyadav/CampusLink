@@ -40,7 +40,9 @@ class Settings(BaseSettings):
     # Embeddings
     EMBEDDING_PROVIDER: str = Field(default="gemini")
     EMBEDDING_MODEL: str = Field(default="text-embedding-004")
+    GEMINI_EMBEDDING_MODEL: str = Field(default="text-embedding-004")
     EMBEDDING_DIMENSION: int = Field(default=768)
+    USE_FAKE_EMBEDDINGS: bool = Field(default=False)
 
     # Document & Storage Settings
     STORAGE_DIR: str = Field(default="storage/private/resumes")

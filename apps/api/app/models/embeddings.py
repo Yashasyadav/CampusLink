@@ -25,4 +25,5 @@ class Embedding(Base, TimestampMixin):
         String(100), default="text-embedding-004", nullable=False
     )
     chunk_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    content_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     metadata_: Mapped[Optional[Dict[str, Any]]] = mapped_column("metadata", JSONB, nullable=True)
