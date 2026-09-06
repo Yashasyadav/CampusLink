@@ -13,6 +13,8 @@ from app.api.routes import (
     connections,
     documents,
     matching,
+    feedback,
+    admin_recommendations,
 )
 
 api_router = APIRouter()
@@ -30,5 +32,7 @@ api_router.include_router(agents.router)
 api_router.include_router(connections.router)
 api_router.include_router(documents.router)
 api_router.include_router(matching.router)
+api_router.include_router(feedback.router)
+api_router.include_router(admin_recommendations.router)
 
 

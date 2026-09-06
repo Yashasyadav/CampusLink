@@ -22,6 +22,8 @@ export interface MatchingResult {
   help_type?: string | null;
   strengths: string[];
   limitations: string[];
+  recommendation_event_id?: string;
+  recommendation_id?: string;
 }
 
 export interface HelpChainNode {

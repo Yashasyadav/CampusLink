@@ -4,15 +4,19 @@ import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 
-export function ProtectedRoute({ children }: { children: React.ReactNode }) {
+export function ProtectedRoute({ children, requireAdmin = false }: { children: React.ReactNode; requireAdmin?: boolean }) {
   const { user, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push("/login");
+    if (!loading) {
+      if (!user) {
+        router.push("/login");
+      } else if (requireAdmin && user.role !== "ADMIN") {
+        router.push("/discover");
+      }
     }
-  }, [loading, user, router]);
+  }, [loading, user, requireAdmin, router]);
 
   // Only render full-screen loading spinner when initial auth state is unknown AND user is null
   if (loading && !user) {
@@ -23,7 +27,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user) {
+  if (!user || (requireAdmin && user.role !== "ADMIN")) {
     return null;
   }
 

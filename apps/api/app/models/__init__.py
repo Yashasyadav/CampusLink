@@ -45,6 +45,8 @@ from app.models.knowledge import (
 from app.models.embeddings import Embedding, EMBEDDING_DIMENSION
 from app.models.connections import Connection, ConnectionStatus
 from app.models.audit import AuditLog
+from app.models.recommendation import RecommendationEvent
+from app.models.feedback import RecommendationFeedback, FeedbackType
 
 __all__ = [
     "Base",
@@ -93,4 +95,7 @@ __all__ = [
     "Connection",
     "ConnectionStatus",
     "AuditLog",
+    "RecommendationEvent",
+    "RecommendationFeedback",
+    "FeedbackType",
 ]

@@ -68,6 +68,22 @@ class GraphExecutionService:
 
         try:
             final_state = self.compiled_graph.invoke(initial_state, config=config)
+            
+            # Phase 10: Record RecommendationEvents for surfaced recommendations
+            try:
+                from app.services.recommendation_quality_service import RecommendationQualityService
+                qs = RecommendationQualityService(db)
+                qs.record_surfaced_recommendations_sync(
+                    request_id=request_id,
+                    user_id=current_user.id,
+                    query=query,
+                    top_people=final_state.get("top_people", []),
+                    top_projects=final_state.get("top_projects", []),
+                    top_solutions=final_state.get("solution_results", []),
+                )
+            except Exception as e_rec:
+                logger.error(f"Failed to record recommendation events: {e_rec}")
+
             return self._format_discovery_response(final_state, query)
         except Exception as exc:
             logger.error(f"LangGraph execution exception: {exc}")

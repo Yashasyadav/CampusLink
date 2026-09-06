@@ -9,9 +9,11 @@ import {
   Building2, ArrowRight, Loader2, AlertCircle,
   Tag, ShieldCheck, ChevronDown, ChevronUp, Zap,
   TerminalSquare, Layers, Network, CheckCircle2,
-  HelpCircle, ExternalLink, Lightbulb, Wrench
+  HelpCircle, ExternalLink, Lightbulb, Wrench,
+  ThumbsUp, ThumbsDown
 } from "lucide-react";
 import { matchingApi } from "@/lib/api/matching";
+import { feedbackApi, FeedbackType } from "@/lib/api/feedback";
 import { MatchingAnalyzeResponse, MatchingResult, HelpChain } from "@/types/matching";
 
 const EXAMPLE_QUERIES = [
@@ -375,115 +377,227 @@ function HelpChainSection({ helpChain }: { helpChain: HelpChain }) {
 {/* ── CANDIDATE CARD COMPONENT ── */}
 function CandidateCard({ item, href, actionLabel, isSolution = false }: { item: MatchingResult; href: string; actionLabel: string; isSolution?: boolean }) {
   const [expanded, setExpanded] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackType, setFeedbackType] = useState<FeedbackType | null>(null);
+  const [comment, setComment] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submittedFeedback, setSubmittedFeedback] = useState<FeedbackType | null>(null);
+  const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
+
   const scorePercent = Math.round(item.relevance_score * 100);
+  const recId = item.recommendation_id || item.recommendation_event_id;
+
+  const handleFeedbackSubmit = async (type: FeedbackType, textComment?: string) => {
+    if (!recId) return;
+    setSubmitting(true);
+    try {
+      await feedbackApi.submitFeedback(recId, {
+        feedback_type: type,
+        comment: textComment || comment,
+      });
+      setSubmittedFeedback(type);
+      setShowFeedbackModal(false);
+      setFeedbackMsg("Feedback saved!");
+    } catch (err: unknown) {
+      setFeedbackMsg("Failed to save feedback");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
-    <div className={`bg-white border rounded-2xl p-5 transition-all shadow-card hover:shadow-card-hover ${isSolution ? 'border-orange-200 bg-orange-50/20' : 'border-slate-200'}`}>
+    <div className={`bg-white border rounded-2xl p-5 transition-all shadow-card hover:shadow-card-hover flex flex-col justify-between ${isSolution ? 'border-orange-200 bg-orange-50/20' : 'border-slate-200'}`}>
       
-      {/* Card Header & Relevance Bar */}
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border ${
-              scorePercent >= 85 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-              scorePercent >= 70 ? 'bg-blue-50 text-blue-700 border-blue-200' :
-              'bg-slate-100 text-slate-700 border-slate-200'
-            }`}>
-              {item.relevance_level}
-            </span>
-            {item.help_type && (
-              <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md uppercase tracking-wider">
-                {item.help_type.replace(/_/g, " ")}
+      <div>
+        {/* Card Header & Relevance Bar */}
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border ${
+                scorePercent >= 85 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                scorePercent >= 70 ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                'bg-slate-100 text-slate-700 border-slate-200'
+              }`}>
+                {item.relevance_level}
               </span>
-            )}
-          </div>
-          <h3 className="font-bold text-slate-900 text-base">{item.title}</h3>
-          {item.subtitle && <p className="text-xs text-slate-500 font-medium">{item.subtitle}</p>}
-        </div>
-
-        {/* Score indicator */}
-        <div className="text-right shrink-0">
-          <div className="inline-flex items-center gap-1.5 font-extrabold text-sm text-slate-900">
-            <div className="w-12 bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
-              <div className="bg-brand-600 h-full rounded-full" style={{ width: `${scorePercent}%` }} />
+              {item.help_type && (
+                <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                  {item.help_type.replace(/_/g, " ")}
+                </span>
+              )}
+              {item.supporting_evidence.length > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-md">
+                  <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                  Grounded ({item.supporting_evidence.length})
+                </span>
+              )}
             </div>
-            <span>{scorePercent}%</span>
+            <h3 className="font-bold text-slate-900 text-base">{item.title}</h3>
+            {item.subtitle && <p className="text-xs text-slate-500 font-medium">{item.subtitle}</p>}
           </div>
-          <p className="text-[10px] text-slate-400 font-medium mt-0.5">Relevance</p>
+
+          {/* Score indicator */}
+          <div className="text-right shrink-0">
+            <div className="inline-flex items-center gap-1.5 font-extrabold text-sm text-slate-900">
+              <div className="w-12 bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+                <div className="bg-brand-600 h-full rounded-full" style={{ width: `${scorePercent}%` }} />
+              </div>
+              <span>{scorePercent}%</span>
+            </div>
+            <p className="text-[10px] text-slate-400 font-medium mt-0.5">Relevance</p>
+          </div>
+        </div>
+
+        {/* Primary explanation summary */}
+        <p className="text-xs text-slate-700 leading-relaxed mb-3 bg-slate-50 p-3 rounded-xl border border-slate-100 font-normal">
+          {item.explanation}
+        </p>
+
+        {/* Matched badges */}
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {item.matched_skills.slice(0, 4).map((sk, i) => (
+            <span key={i} className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">{sk}</span>
+          ))}
+          {item.matched_technologies.slice(0, 4).map((tc, i) => (
+            <span key={i} className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-orange-50 text-orange-700 border border-orange-200">{tc}</span>
+          ))}
+        </div>
+
+        {/* Expandable Why This Match drawer */}
+        <div className="border-t border-slate-100 pt-3">
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="inline-flex items-center gap-1.5 text-[12px] font-bold text-slate-600 hover:text-brand-600 transition"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-brand-600" />
+            Why this match?
+            {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+
+          {expanded && (
+            <div className="mt-3 space-y-3 pt-2 text-xs border-t border-slate-100">
+              {item.strengths.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Key Strengths</p>
+                  <ul className="space-y-1 text-slate-700">
+                    {item.strengths.map((str, i) => (
+                      <li key={i} className="flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                        {str}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {item.supporting_evidence.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Supporting Evidence</p>
+                  <div className="space-y-2">
+                    {item.supporting_evidence.map((ev, i) => (
+                      <div key={i} className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-[11px] text-slate-600">
+                        <div className="flex items-center justify-between font-bold text-slate-800 mb-0.5">
+                          <span>[{ev.source_type}] {ev.source_title}</span>
+                          <span className="text-emerald-600 font-mono text-[10px]">{Math.round(ev.relevance * 100)}% match</span>
+                        </div>
+                        <p className="line-clamp-2 italic">{ev.snippet}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Primary explanation summary */}
-      <p className="text-xs text-slate-700 leading-relaxed mb-3 bg-slate-50 p-3 rounded-xl border border-slate-100 font-normal">
-        {item.explanation}
-      </p>
+      {/* Footer & Feedback Controls */}
+      <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          {/* Feedback buttons */}
+          {recId ? (
+            <div className="flex items-center gap-1.5 relative">
+              {submittedFeedback ? (
+                <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg inline-flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  {submittedFeedback === "HELPFUL" ? "Helpful" : submittedFeedback.replace(/_/g, " ")}
+                </span>
+              ) : (
+                <>
+                  <button
+                    onClick={() => handleFeedbackSubmit("HELPFUL")}
+                    disabled={submitting}
+                    className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 text-slate-600 transition inline-flex items-center gap-1"
+                    title="Mark recommendation as helpful"
+                  >
+                    <ThumbsUp className="w-3 h-3" />
+                    Helpful
+                  </button>
+                  <button
+                    onClick={() => setShowFeedbackModal(!showFeedbackModal)}
+                    disabled={submitting}
+                    className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-700 text-slate-600 transition inline-flex items-center gap-1"
+                    title="Provide detailed feedback"
+                  >
+                    <ThumbsDown className="w-3 h-3" />
+                    Not helpful
+                  </button>
+                </>
+              )}
 
-      {/* Matched badges */}
-      <div className="flex flex-wrap gap-1.5 mb-4">
-        {item.matched_skills.slice(0, 3).map((sk, i) => (
-          <span key={i} className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">{sk}</span>
-        ))}
-        {item.matched_technologies.slice(0, 3).map((tc, i) => (
-          <span key={i} className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-orange-50 text-orange-700 border border-orange-200">{tc}</span>
-        ))}
-      </div>
-
-      {/* Expandable Why This Match drawer */}
-      <div className="border-t border-slate-100 pt-3">
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="inline-flex items-center gap-1.5 text-[12px] font-bold text-slate-600 hover:text-brand-600 transition"
-        >
-          <HelpCircle className="w-3.5 h-3.5 text-brand-600" />
-          Why this match?
-          {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-        </button>
-
-        {expanded && (
-          <div className="mt-3 space-y-3 pt-2 text-xs border-t border-slate-100">
-            {item.strengths.length > 0 && (
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Key Strengths</p>
-                <ul className="space-y-1 text-slate-700">
-                  {item.strengths.map((str, i) => (
-                    <li key={i} className="flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
-                      {str}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {item.supporting_evidence.length > 0 && (
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Supporting Evidence</p>
-                <div className="space-y-2">
-                  {item.supporting_evidence.map((ev, i) => (
-                    <div key={i} className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-[11px] text-slate-600">
-                      <div className="flex items-center justify-between font-bold text-slate-800 mb-0.5">
-                        <span>[{ev.source_type}] {ev.source_title}</span>
-                        <span className="text-emerald-600 font-mono text-[10px]">{Math.round(ev.relevance * 100)}% match</span>
-                      </div>
-                      <p className="line-clamp-2 italic">{ev.snippet}</p>
-                    </div>
-                  ))}
+              {/* Feedback reason dropdown modal */}
+              {showFeedbackModal && (
+                <div className="absolute bottom-9 left-0 w-64 bg-white border border-slate-200 rounded-xl p-3 shadow-xl z-20 space-y-2 text-xs">
+                  <p className="font-bold text-slate-800">Why was this recommendation unhelpful?</p>
+                  <div className="space-y-1">
+                    {[
+                      { type: "NOT_HELPFUL", label: "Not Relevant" },
+                      { type: "WRONG_MATCH", label: "Wrong Skills / Domain" },
+                      { type: "INSUFFICIENT_EVIDENCE", label: "Weak Evidence" },
+                      { type: "OUTDATED", label: "Outdated Profile" },
+                    ].map((opt) => (
+                      <button
+                        key={opt.type}
+                        onClick={() => {
+                          setFeedbackType(opt.type as FeedbackType);
+                          handleFeedbackSubmit(opt.type as FeedbackType);
+                        }}
+                        className="w-full text-left px-2 py-1 rounded hover:bg-slate-100 text-slate-700 transition font-medium"
+                      >
+                        • {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Optional comment..."
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    className="w-full px-2 py-1 border border-slate-200 rounded text-[11px] text-slate-800 focus:outline-none focus:border-brand-500"
+                  />
+                  <div className="flex justify-end gap-1 pt-1">
+                    <button
+                      onClick={() => setShowFeedbackModal(false)}
+                      className="px-2 py-0.5 rounded text-slate-500 hover:text-slate-700 text-[10px]"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+              )}
+            </div>
+          ) : (
+            <span className="text-[11px] text-slate-400 font-medium">Evidence: {item.evidence_strength}</span>
+          )}
 
-      {/* Action link */}
-      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-        <span className="text-[11px] text-slate-400 font-medium">Evidence: {item.evidence_strength}</span>
-        <Link
-          href={href}
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-600 hover:text-brand-700 transition"
-        >
-          {actionLabel} <ArrowRight className="w-3.5 h-3.5" />
-        </Link>
+          {/* Action link */}
+          <Link
+            href={href}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-600 hover:text-brand-700 transition"
+          >
+            {actionLabel} <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
       </div>
     </div>
   );
