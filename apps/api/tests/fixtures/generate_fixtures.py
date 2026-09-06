@@ -1,3 +1,8 @@
+"""Resume Fixture Generator for CampusLink AI E2E Testing.
+
+Creates valid synthetic PDF and DOCX resume files for test accounts.
+DO NOT USE REAL PERSONAL DATA OR SECRETS.
+"""
 import io
 from pathlib import Path
 import docx
@@ -43,14 +48,28 @@ def generate_all_fixtures():
     target_dir = Path(__file__).parent / "resumes"
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. Full Stack PDF
+    # 1. Meera Nair DSP Resume (PDF) - Private Document Test
+    meera_pdf = create_minimal_pdf_bytes(
+        "Meera Nair Resume",
+        "Meera Nair. Electronics & Communication. Skills: DSP, Audio Processing, Noise Reduction, Spectral Analysis, Python, MATLAB. Project: Microphone Noise Reduction using Spectral Filtering.",
+    )
+    (target_dir / "meera_nair_dsp.pdf").write_bytes(meera_pdf)
+
+    # 2. Aarav Menon TinyML Resume (PDF)
+    aarav_pdf = create_minimal_pdf_bytes(
+        "Aarav Menon Resume",
+        "Aarav Menon. Computer Science. Skills: ESP32, TinyML, Python, C++, Audio Processing, MFCC, TensorFlow Lite Micro. Project: ESP32 TinyML Keyword Detection.",
+    )
+    (target_dir / "aarav_menon_tinyml.pdf").write_bytes(aarav_pdf)
+
+    # 3. Full Stack PDF
     full_stack_pdf = create_minimal_pdf_bytes(
         "Alex Chen Resume",
         "Alex Chen. Full Stack Developer. Skills: Python, React, PostgreSQL, Docker. Project: Smart Campus Portal using Python and React.",
     )
     (target_dir / "student_full_stack.pdf").write_bytes(full_stack_pdf)
 
-    # 2. IoT DOCX
+    # 4. IoT DOCX
     iot_docx = create_docx_bytes(
         "Taylor Smith Resume",
         [
@@ -63,7 +82,7 @@ def generate_all_fixtures():
     )
     (target_dir / "student_iot.docx").write_bytes(iot_docx)
 
-    # 3. Minimal PDF
+    # 5. Minimal PDF
     minimal_pdf = create_minimal_pdf_bytes("Jordan Doe", "Jordan Doe. Student. Python developer.")
     (target_dir / "student_minimal.pdf").write_bytes(minimal_pdf)
 

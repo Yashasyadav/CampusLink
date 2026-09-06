@@ -84,8 +84,9 @@ def build_project_text(project: Project) -> Optional[str]:
         parts.append(f"Description: {project.description.strip()}")
 
     if hasattr(project, "technologies") and project.technologies:
-        if isinstance(project.technologies, list):
-            parts.append(f"Technologies: {', '.join(project.technologies)}")
+        tech_names = [t.name if hasattr(t, "name") else str(t) for t in project.technologies]
+        if tech_names:
+            parts.append(f"Technologies: {', '.join(tech_names)}")
 
     if hasattr(project, "project_skills") and project.project_skills:
         skill_names = [ps.skill.name for ps in project.project_skills if hasattr(ps, "skill") and ps.skill]
@@ -116,8 +117,9 @@ def build_research_text(research: ResearchItem) -> Optional[str]:
         parts.append(f"Abstract: {research.abstract.strip()}")
 
     if hasattr(research, "technologies") and research.technologies:
-        if isinstance(research.technologies, list):
-            parts.append(f"Technologies: {', '.join(research.technologies)}")
+        tech_names = [t.name if hasattr(t, "name") else str(t) for t in research.technologies]
+        if tech_names:
+            parts.append(f"Technologies: {', '.join(tech_names)}")
 
     if hasattr(research, "authors") and research.authors:
         author_names = [a.user.profile.full_name for a in research.authors if hasattr(a, "user") and a.user and hasattr(a.user, "profile") and a.user.profile]
@@ -205,8 +207,14 @@ def build_problem_solution_text(ps: ProblemSolution) -> Optional[str]:
     if ps.lessons_learned:
         parts.append(f"Lessons Learned: {ps.lessons_learned.strip()}")
 
-    if hasattr(ps, "technologies") and ps.technologies:
+    if hasattr(ps, "ps_technologies") and ps.ps_technologies:
+        tech_names = [t.name if hasattr(t, "name") else str(t) for t in ps.ps_technologies]
+        if tech_names:
+            parts.append(f"Technologies: {', '.join(tech_names)}")
+    elif hasattr(ps, "technologies") and ps.technologies:
         if isinstance(ps.technologies, list):
-            parts.append(f"Technologies: {', '.join(ps.technologies)}")
+            tech_names = [t.name if hasattr(t, "name") else str(t) for t in ps.technologies]
+            if tech_names:
+                parts.append(f"Technologies: {', '.join(tech_names)}")
 
     return "\n".join(parts)
