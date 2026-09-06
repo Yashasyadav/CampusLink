@@ -12,6 +12,7 @@ from app.api.routes import (
     agents,
     connections,
     documents,
+    matching,
 )
 
 api_router = APIRouter()
@@ -28,4 +29,6 @@ api_router.include_router(search.router)
 api_router.include_router(agents.router)
 api_router.include_router(connections.router)
 api_router.include_router(documents.router)
+api_router.include_router(matching.router)
+
 

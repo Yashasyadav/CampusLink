@@ -57,5 +57,19 @@ class Settings(BaseSettings):
     COOKIE_SECURE: bool = Field(default=False)
     COOKIE_SAMESITE: str = Field(default="lax")
 
+    # Matching & Explanation
+    MATCHING_WEIGHTS: dict = Field(
+        default={
+            "semantic_relevance": 0.35,
+            "skill_overlap": 0.20,
+            "technology_overlap": 0.15,
+            "project_evidence": 0.15,
+            "solution_evidence": 0.10,
+            "evidence_quality": 0.05,
+        }
+    )
+
 
 settings = Settings()
+MATCHING_WEIGHTS = settings.MATCHING_WEIGHTS
+
