@@ -5,19 +5,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, get_db
 from app.models.users import User
 from app.schemas.agents import DiscoveryRequest, DiscoveryResponse
-from app.services.agent_execution_service import AgentExecutionService
+from app.graph.execution import GraphExecutionService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/agents", tags=["Agentic Discovery"])
-execution_service = AgentExecutionService()
+graph_execution_service = GraphExecutionService()
 
 
 @router.post(
     "/discover",
     response_model=DiscoveryResponse,
     status_code=status.HTTP_200_OK,
-    summary="Execute agentic campus discovery investigation across people, projects, and resources",
+    summary="Execute agentic campus discovery investigation across people, projects, and resources via LangGraph",
 )
 async def discover_campus_knowledge(
     body: DiscoveryRequest,
@@ -25,16 +25,15 @@ async def discover_campus_knowledge(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Run Phase 7 specialized discovery investigation:
-    1. Query Understanding Agent extracts intent, domains, skills, & technologies.
-    2. People Discovery Agent finds evidence-backed experts.
-    3. Project & Knowledge Discovery Agent finds similar projects, research, & solutions.
-    4. Facility Discovery Agent finds relevant labs & equipment.
-    5. Returns aggregated evidence & agent execution metadata.
+    Run Phase 9 LangGraph stateful workflow orchestration:
+    1. Initialize request & query understanding.
+    2. Dynamic parallel discovery fan-out (People, Knowledge, Facilities).
+    3. Aggregate evidence & evaluate matching.
+    4. Validate security, schemas, and return DiscoveryResponse with trace.
     """
     try:
         def _do_discover(sync_db):
-            return execution_service.discover(
+            return graph_execution_service.run_workflow(
                 db=sync_db,
                 current_user=current_user,
                 query=body.query,
@@ -49,3 +48,4 @@ async def discover_campus_knowledge(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Agent discovery investigation failed: {str(exc)}",
         )
+
