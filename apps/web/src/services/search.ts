@@ -49,14 +49,14 @@ export interface ReindexResponse {
 
 export const searchService = {
   executeSearch: async (payload: SearchQueryPayload): Promise<SearchQueryResponse> => {
-    return fetchApi<SearchQueryResponse>("/search", {
+    return fetchApi<SearchQueryResponse>("/api/v1/search", {
       method: "POST",
       body: JSON.stringify(payload),
     });
   },
 
   reindex: async (entityTypes?: EntityTypeFilter[]): Promise<ReindexResponse> => {
-    return fetchApi<ReindexResponse>("/search/reindex", {
+    return fetchApi<ReindexResponse>("/api/v1/search/reindex", {
       method: "POST",
       body: JSON.stringify({ entity_types: entityTypes }),
     });

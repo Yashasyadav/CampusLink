@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!res.user.profile_completed) {
         router.push("/onboarding");
       } else {
-        router.push("/dashboard");
+        router.push("/discover");
       }
     } catch (err) {
       if (err instanceof ApiError) {

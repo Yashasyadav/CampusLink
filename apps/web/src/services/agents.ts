@@ -88,7 +88,7 @@ export interface DiscoveryResponse {
 
 export const agentService = {
   discover: async (query: string): Promise<DiscoveryResponse> => {
-    return fetchApi<DiscoveryResponse>("/agents/discover", {
+    return fetchApi<DiscoveryResponse>("/api/v1/agents/discover", {
       method: "POST",
       body: JSON.stringify({ query }),
     });
