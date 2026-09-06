@@ -264,7 +264,8 @@ class SearchService:
             vis = proj.visibility.value if hasattr(proj.visibility, "value") else str(proj.visibility)
             if vis == "PRIVATE":
                 # Private project accessible ONLY if user is owner/creator
-                if not user_id or proj.owner_id != user_id:
+                creator_id = getattr(proj, "created_by", None) or getattr(proj, "owner_id", None)
+                if not user_id or creator_id != user_id:
                     return None
 
             return SearchResultItem(
@@ -287,7 +288,8 @@ class SearchService:
 
             vis = res.visibility.value if hasattr(res.visibility, "value") else str(res.visibility)
             if vis == "PRIVATE":
-                if not user_id or res.created_by_id != user_id:
+                creator_id = getattr(res, "created_by", None) or getattr(res, "created_by_id", None)
+                if not user_id or creator_id != user_id:
                     return None
 
             return SearchResultItem(
