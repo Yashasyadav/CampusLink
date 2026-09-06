@@ -3,30 +3,20 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
-import { Eye, EyeOff, Lock, Mail, UserCheck, AlertCircle, Loader2 } from "lucide-react";
+import { Lock, Mail, AlertCircle, Loader2, Sparkles, GraduationCap, UserCheck, Award } from "lucide-react";
 
 export default function RegisterPage() {
   const { register } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [role, setRole] = useState<"STUDENT" | "FACULTY" | "ALUMNI">("STUDENT");
-  const [showPassword, setShowPassword] = useState(false);
+  const [role, setRole] = useState("STUDENT");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password || !confirmPassword) {
-      setError("All fields are required.");
-      return;
-    }
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters long.");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+    if (!email || !password) {
+      setError("Please fill in both email and password.");
       return;
     }
 
@@ -35,136 +25,145 @@ export default function RegisterPage() {
       setLoading(true);
       await register(email, password, role);
     } catch (err: any) {
-      setError(err?.message || "Registration failed. Please check your details.");
+      setError(err?.message || "Registration failed. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
+  const ROLES = [
+    { id: "STUDENT", title: "Student", icon: GraduationCap, desc: "Explore projects, find collaborators, & solve problems." },
+    { id: "FACULTY", title: "Faculty", icon: UserCheck, desc: "Manage research items, direct labs, & guide students." },
+    { id: "ALUMNI", title: "Alumni", icon: Award, desc: "Share industry experience & mentor campus teams." },
+  ];
+
   return (
-    <main className="flex items-center justify-center min-h-screen px-4 py-12 bg-slate-950 text-slate-100">
-      <div className="w-full max-w-md space-y-8 bg-slate-900/80 p-8 rounded-2xl border border-slate-800 backdrop-blur-xl shadow-2xl">
-        <div className="space-y-2 text-center">
-          <div className="inline-block px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-sky-950 text-sky-400 border border-sky-800/40">
-            CampusLink AI
+    <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4 md:p-8">
+      <div className="w-full max-w-5xl bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-12 min-h-[620px]">
+        {/* Left Branding Panel */}
+        <div className="md:col-span-5 bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-800 p-8 md:p-12 text-white flex flex-col justify-between relative overflow-hidden">
+          <div className="relative z-10 space-y-6">
+            <Link href="/" className="inline-flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-lg">
+                <Sparkles className="w-5 h-5 text-orange-400" />
+              </div>
+              <span className="font-extrabold text-xl tracking-tight text-white">
+                CampusLink <span className="text-orange-400">AI</span>
+              </span>
+            </Link>
+
+            <div className="space-y-3 pt-6">
+              <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-white/10 border border-white/20 text-blue-100">
+                Join the Campus Expertise Network
+              </span>
+              <h2 className="text-2xl md:text-3xl font-extrabold leading-tight text-white">
+                Create your CampusLink account.
+              </h2>
+              <p className="text-blue-100 text-xs leading-relaxed max-w-sm">
+                Connect with verified projects, research papers, hardware laboratories, and problem/solution records.
+              </p>
+            </div>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-50">
-            Create an Account
-          </h1>
-          <p className="text-sm text-slate-400">
-            Join your campus knowledge and expertise network
-          </p>
         </div>
 
-        {error && (
-          <div className="flex items-start space-x-3 p-4 rounded-xl bg-red-950/50 border border-red-800/50 text-red-300 text-sm">
-            <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-400 mt-0.5" />
-            <span>{error}</span>
+        {/* Right Form Card Panel */}
+        <div className="md:col-span-7 p-8 md:p-12 flex flex-col justify-center bg-white space-y-6">
+          <div className="space-y-1">
+            <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Create an Account</h3>
+            <p className="text-xs text-slate-500">Select your role and enter your credentials.</p>
           </div>
-        )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="space-y-1.5">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
-              Campus Email
-            </label>
-            <div className="relative">
-              <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="your.email@campuslink.edu"
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm transition"
-              />
+          {error && (
+            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs">
+              <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+              <span>{error}</span>
             </div>
-          </div>
+          )}
 
-          <div className="space-y-1.5">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
-              Campus Role
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {(["STUDENT", "FACULTY", "ALUMNI"] as const).map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setRole(r)}
-                  className={`py-2 px-3 rounded-xl text-xs font-semibold uppercase tracking-wider border transition ${
-                    role === r
-                      ? "bg-sky-600 border-sky-500 text-white shadow-sm"
-                      : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
-                  }`}
-                >
-                  {r.toLowerCase()}
-                </button>
-              ))}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Role Cards */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                Select Your Campus Role
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {ROLES.map(({ id, title, icon: Icon }) => {
+                  const isSelected = role === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setRole(id)}
+                      className={`p-3 rounded-xl border text-left flex flex-col items-center justify-center gap-1.5 transition ${
+                        isSelected
+                          ? "border-blue-600 bg-blue-50 text-blue-700 ring-2 ring-blue-600/20 font-bold"
+                          : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      <Icon className={`w-5 h-5 ${isSelected ? "text-blue-600" : "text-slate-400"}`} />
+                      <span className="text-xs font-semibold">{title}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-1.5">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
-              Password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
-              <input
-                type={showPassword ? "text" : "password"}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Min. 8 characters"
-                className="w-full pl-10 pr-11 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm transition"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3.5 top-3 text-slate-500 hover:text-slate-300 transition"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
+            <div className="space-y-1">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                Campus Email Address
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="student@campuslink.edu"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white text-xs transition"
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-1.5">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
-              Confirm Password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
-              <input
-                type={showPassword ? "text" : "password"}
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Re-enter password"
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm transition"
-              />
+            <div className="space-y-1">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Password123!"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white text-xs transition"
+                />
+              </div>
             </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex items-center justify-center py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-blue-600/20 disabled:opacity-50"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Creating account...
+                </>
+              ) : (
+                "Create CampusLink Account"
+              )}
+            </button>
+          </form>
+
+          <div className="pt-4 text-center text-xs text-slate-500 border-t border-slate-100">
+            Already have an account?{" "}
+            <Link href="/login" className="font-bold text-blue-600 hover:text-blue-700 transition">
+              Sign in
+            </Link>
           </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full flex items-center justify-center py-2.5 px-4 bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold rounded-xl transition shadow-lg shadow-sky-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                Creating account...
-              </>
-            ) : (
-              "Register Account"
-            )}
-          </button>
-        </form>
-
-        <div className="pt-4 text-center text-xs text-slate-500 border-t border-slate-800/80">
-          Already have an account?{" "}
-          <Link href="/login" className="font-semibold text-sky-400 hover:text-sky-300 transition">
-            Sign in here
-          </Link>
         </div>
       </div>
     </main>

@@ -14,10 +14,11 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     }
   }, [loading, user, router]);
 
-  if (loading) {
+  // Only render full-screen loading spinner when initial auth state is unknown AND user is null
+  if (loading && !user) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-950 text-slate-400">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-500"></div>
+      <div className="flex items-center justify-center min-h-screen bg-slate-50 text-slate-400">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     );
   }

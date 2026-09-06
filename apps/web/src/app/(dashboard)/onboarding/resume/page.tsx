@@ -115,18 +115,18 @@ function ResumeUploadContent() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 py-12 px-4 flex flex-col items-center">
+    <main className="min-h-screen bg-slate-50 text-slate-900 py-12 px-4 flex flex-col items-center">
       <div className="w-full max-w-2xl space-y-8">
         <div>
-          <h1 className="text-2xl font-bold text-slate-50">Resume Upload & Document Intelligence</h1>
-          <p className="text-sm text-slate-400 mt-1">
+          <h1 className="text-2xl font-bold text-slate-900">Resume Upload & Document Intelligence</h1>
+          <p className="text-sm text-slate-500 mt-1">
             Upload your resume (PDF or DOCX, max 10MB). Gemini AI will extract skills, projects, and domain experience for your review.
           </p>
         </div>
 
         {error && (
-          <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-sm flex items-center space-x-3">
-            <AlertCircle className="w-5 h-5 flex-shrink-0 text-rose-400" />
+          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm flex items-center space-x-3">
+            <AlertCircle className="w-5 h-5 flex-shrink-0 text-rose-600" />
             <span>{error}</span>
           </div>
         )}
@@ -139,18 +139,18 @@ function ResumeUploadContent() {
           }}
           onDragLeave={() => setIsDragOver(false)}
           onDrop={handleDrop}
-          className={`border-2 border-dashed rounded-2xl p-8 text-center transition flex flex-col items-center justify-center space-y-4 ${
-            isDragOver ? "border-sky-500 bg-sky-950/20" : "border-slate-800 bg-slate-900/60 hover:border-slate-700"
+          className={`border-2 border-dashed rounded-2xl p-8 text-center transition flex flex-col items-center justify-center space-y-4 shadow-sm ${
+            isDragOver ? "border-blue-500 bg-blue-50/50" : "border-slate-200 bg-white hover:border-slate-300"
           }`}
         >
-          <div className="w-14 h-14 rounded-2xl bg-sky-950/80 border border-sky-800/50 flex items-center justify-center text-sky-400">
+          <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
             <Upload className="w-7 h-7" />
           </div>
 
           <div className="space-y-1">
-            <p className="text-base font-semibold text-slate-200">
+            <p className="text-base font-semibold text-slate-800">
               Drag & drop your resume file here, or{" "}
-              <label className="text-sky-400 hover:underline cursor-pointer">
+              <label className="text-blue-600 hover:underline cursor-pointer">
                 browse files
                 <input
                   type="file"
@@ -160,32 +160,32 @@ function ResumeUploadContent() {
                 />
               </label>
             </p>
-            <p className="text-xs text-slate-500">Supports PDF and DOCX formats up to 10MB</p>
+            <p className="text-xs text-slate-400">Supports PDF and DOCX formats up to 10MB</p>
           </div>
 
           {file && (
-            <div className="w-full max-w-md bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+            <div className="w-full max-w-md bg-slate-50 p-4 rounded-xl border border-slate-200 flex items-center justify-between">
               <div className="flex items-center space-x-3 truncate">
-                <FileText className="w-5 h-5 text-sky-400 flex-shrink-0" />
-                <span className="text-sm font-medium text-slate-200 truncate">{file.name}</span>
+                <FileText className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                <span className="text-sm font-medium text-slate-800 truncate">{file.name}</span>
               </div>
-              <span className="text-xs text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+              <span className="text-xs text-slate-400">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
             </div>
           )}
         </div>
 
         {/* Current Active Resume Status */}
         {currentDoc && !file && (
-          <div className="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 space-y-4">
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Active Resume Document</h3>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Active Resume Document</h3>
               <span
                 className={`px-3 py-1 text-xs font-semibold rounded-full ${
                   currentDoc.processing_status === "CONFIRMED"
-                    ? "bg-emerald-950 text-emerald-400 border border-emerald-800/50"
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                     : currentDoc.processing_status === "REVIEW_REQUIRED"
-                    ? "bg-amber-950 text-amber-400 border border-amber-800/50"
-                    : "bg-slate-800 text-slate-300"
+                    ? "bg-amber-50 text-amber-700 border border-amber-200"
+                    : "bg-slate-100 text-slate-600"
                 }`}
               >
                 {currentDoc.processing_status}
@@ -194,12 +194,12 @@ function ResumeUploadContent() {
 
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center space-x-3">
-                <FileText className="w-5 h-5 text-sky-400" />
-                <span className="font-medium text-slate-200">{currentDoc.original_filename}</span>
+                <FileText className="w-5 h-5 text-blue-600" />
+                <span className="font-medium text-slate-800">{currentDoc.original_filename}</span>
               </div>
               <button
                 onClick={() => router.push(`/onboarding/resume/review?doc_id=${currentDoc.id}`)}
-                className="text-xs text-sky-400 hover:underline font-semibold flex items-center"
+                className="text-xs text-blue-600 hover:underline font-semibold flex items-center"
               >
                 Review Candidates <ArrowRight className="w-3.5 h-3.5 ml-1" />
               </button>
@@ -211,7 +211,7 @@ function ResumeUploadContent() {
         <div className="flex justify-between items-center pt-4">
           <button
             onClick={() => router.push("/onboarding")}
-            className="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold rounded-xl"
+            className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl"
           >
             Back to Onboarding
           </button>
@@ -219,7 +219,7 @@ function ResumeUploadContent() {
           <button
             onClick={handleUploadAndProcess}
             disabled={(!file && !currentDoc) || uploading || processing}
-            className="flex items-center py-2.5 px-6 bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm rounded-xl transition disabled:opacity-50"
+            className="flex items-center py-2.5 px-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl transition disabled:opacity-50 shadow-md shadow-blue-600/20"
           >
             {uploading ? (
               <>

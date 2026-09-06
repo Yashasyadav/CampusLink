@@ -20,6 +20,8 @@ from app.models import (
     Connection, ConnectionStatus,
 )
 
+from app.core.security import hash_password
+
 logger = logging.getLogger("campuslink.seed")
 
 
@@ -34,6 +36,9 @@ def run_seed():
         if existing_users > 0:
             logger.info(f"Database already contains {existing_users} users. Skipping seed.")
             return
+
+        # Default development password hash
+        dev_password_hash = hash_password("Password123!")
 
         # 1. Create Skills
         skills_data = [
@@ -60,7 +65,7 @@ def run_seed():
         # Synthetic Student 1
         student1 = User(
             email="dev.student1@campuslink.edu",
-            password_hash="dev_pbkdf2_sha256_synthetic_hash_student1",
+            password_hash=dev_password_hash,
             role=UserRole.STUDENT,
             status=UserStatus.ACTIVE,
             email_verified=True,
@@ -81,7 +86,7 @@ def run_seed():
         # Synthetic Student 2
         student2 = User(
             email="dev.student2@campuslink.edu",
-            password_hash="dev_pbkdf2_sha256_synthetic_hash_student2",
+            password_hash=dev_password_hash,
             role=UserRole.STUDENT,
             status=UserStatus.ACTIVE,
             email_verified=True,
@@ -101,7 +106,7 @@ def run_seed():
         # Synthetic Faculty Member
         faculty1 = User(
             email="dev.faculty1@campuslink.edu",
-            password_hash="dev_pbkdf2_sha256_synthetic_hash_faculty1",
+            password_hash=dev_password_hash,
             role=UserRole.FACULTY,
             status=UserStatus.ACTIVE,
             email_verified=True,

@@ -69,6 +69,7 @@ CampusLink AI is constructed using a disciplined phase-by-phase roadmap:
 - **Phase 5**: Projects, Research, Facilities & Campus Knowledge Intelligence — COMPLETE
 - **Phase 6**: Embeddings, Semantic Vector Search & Hybrid Search — COMPLETE
 - **Phase 7**: Agentic Campus Discovery — COMPLETE
+- **Phase 7.5**: UI/UX Overhaul, SaaS Identity & Navigation Stabilization — COMPLETE ([Documentation](docs/ui-ux-overhaul.md))
 
 ---
 

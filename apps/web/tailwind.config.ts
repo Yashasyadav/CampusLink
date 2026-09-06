@@ -11,23 +11,41 @@ const config: Config = {
     extend: {
       colors: {
         brand: {
-          50: '#f0f7ff',
-          100: '#e0effe',
-          200: '#bae0fd',
-          500: '#0284c7',
-          600: '#0369a1',
-          700: '#075985',
-          900: '#0c4a6e',
-          950: '#082f49',
+          50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: '#60a5fa',
+          500: '#3b82f6',
+          600: '#2563eb', // Primary Blue
+          700: '#1d4ed8', // Deep Blue
+          800: '#1e40af',
+          900: '#1e3a8a',
+          950: '#0f172a',
+        },
+        accent: {
+          50: '#fff7ed', // Soft Orange
+          100: '#ffedd5',
+          200: '#fed7aa',
+          300: '#fdba74',
+          400: '#fb923c',
+          500: '#f97316', // Accent Orange
+          600: '#ea580c',
+          700: '#c2410c',
         },
         surface: {
-          dark: '#0b0f19',
-          card: '#111827',
-          border: '#1f2937',
-        }
+          DEFAULT: '#ffffff',
+          subtle: '#f8fafc',
+          muted: '#f1f5f9',
+          border: '#e2e8f0',
+        },
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
       },
     },
   },
   plugins: [],
 };
+
 export default config;

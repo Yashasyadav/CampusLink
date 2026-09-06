@@ -35,12 +35,27 @@ def student_b_cookies():
 def admin_cookies():
     """Admin auth session."""
     email = f"admin_{uuid.uuid4().hex[:8]}@campuslink.edu"
+    password = "Password123!"
     reg = client.post(
         "/api/v1/auth/register",
-        json={"email": email, "password": "Password123!", "role": "ADMIN"},
+        json={"email": email, "password": password, "role": "STUDENT"},
     )
     assert reg.status_code == 201
-    return reg.cookies
+
+    from app.db.session import sync_engine
+    from app.models.users import User, UserRole
+    from sqlalchemy.orm import Session
+
+    with Session(sync_engine) as db:
+        db.query(User).filter(User.email == email).update({"role": UserRole.ADMIN})
+        db.commit()
+
+    login_resp = client.post(
+        "/api/v1/auth/login",
+        json={"email": email, "password": password},
+    )
+    assert login_resp.status_code == 200
+    return login_resp.cookies
 
 
 # ============================================================
@@ -82,7 +97,7 @@ def test_search_and_reindex_flow(student_a_cookies, admin_cookies):
     sol_id = sol_resp.json()["id"]
 
     # 2. Trigger Reindex as Admin
-    reindex_resp = client.post("/api/v1/search/reindex", cookies=admin_cookies)
+    reindex_resp = client.post("/api/v1/search/reindex", json={}, cookies=admin_cookies)
     assert reindex_resp.status_code == 200
     r_data = reindex_resp.json()
     assert r_data["status"] == "SUCCESS"
@@ -109,7 +124,7 @@ def test_search_and_reindex_flow(student_a_cookies, admin_cookies):
         assert "api_key" not in item
 
 
-def test_visibility_and_privacy_enforcement(student_a_cookies, student_b_cookies):
+def test_visibility_and_privacy_enforcement(student_a_cookies, student_b_cookies, admin_cookies):
     # 1. Student A creates a PRIVATE project
     priv_proj = client.post(
         "/api/v1/projects",
@@ -123,6 +138,10 @@ def test_visibility_and_privacy_enforcement(student_a_cookies, student_b_cookies
     )
     assert priv_proj.status_code == 201
     priv_proj_id = priv_proj.json()["id"]
+
+    # Reindex to register private project in search store
+    reindex_resp = client.post("/api/v1/search/reindex", json={}, cookies=admin_cookies)
+    assert reindex_resp.status_code == 200
 
     # 2. Student B searches for quantum encryption
     search_req = {

@@ -79,6 +79,7 @@ async def rebuild_index(
     Requires ADMIN role.
     """
     try:
+        await db.commit()
         entity_types_str = None
         if body and body.entity_types:
             entity_types_str = [et.value for et in body.entity_types]
@@ -87,6 +88,7 @@ async def rebuild_index(
             return indexing_service.reindex_all(sync_db, entity_types=entity_types_str)
 
         report = await db.run_sync(_do_reindex)
+        await db.commit()
 
         return ReindexResponse(
             status="SUCCESS",

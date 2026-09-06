@@ -176,19 +176,19 @@ function ExtractionReviewContent() {
   const renderConfidenceBadge = (confidence: number) => {
     if (confidence >= 0.85) {
       return (
-        <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/50">
+        <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
           High confidence
         </span>
       );
     } else if (confidence >= 0.6) {
       return (
-        <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-amber-950 text-amber-400 border border-amber-800/50">
+        <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-amber-50 text-amber-700 border border-amber-200">
           Medium confidence
         </span>
       );
     }
     return (
-      <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-rose-950 text-rose-400 border border-rose-800/50">
+      <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-rose-50 text-rose-700 border border-rose-200">
         Needs review
       </span>
     );
@@ -196,8 +196,8 @@ function ExtractionReviewContent() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
-        <div className="flex items-center space-x-3 text-sky-400 font-semibold">
+      <main className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center">
+        <div className="flex items-center space-x-3 text-blue-600 font-semibold">
           <Loader2 className="w-6 h-6 animate-spin" />
           <span>Loading extraction results...</span>
         </div>
@@ -206,69 +206,69 @@ function ExtractionReviewContent() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 py-12 px-4 flex flex-col items-center">
+    <main className="min-h-screen bg-slate-50 text-slate-900 py-12 px-4 flex flex-col items-center">
       <div className="w-full max-w-4xl space-y-8">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-6">
+        <div className="flex items-center justify-between border-b border-slate-200 pb-6">
           <div>
-            <h1 className="text-2xl font-bold text-slate-50">Resume Extraction Review</h1>
-            <p className="text-sm text-slate-400 mt-1">
+            <h1 className="text-2xl font-bold text-slate-900">Resume Extraction Review</h1>
+            <p className="text-sm text-slate-500 mt-1">
               Review and confirm AI-extracted details before applying them to your CampusLink profile.
             </p>
           </div>
           <div className="flex items-center space-x-3">
-            <span className="text-xs text-slate-400 font-medium">Overall Confidence:</span>
+            <span className="text-xs text-slate-500 font-medium">Overall Confidence:</span>
             {renderConfidenceBadge(overallConfidence)}
           </div>
         </div>
 
         {error && (
-          <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-sm flex items-center space-x-3">
-            <AlertCircle className="w-5 h-5 flex-shrink-0 text-rose-400" />
+          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm flex items-center space-x-3">
+            <AlertCircle className="w-5 h-5 flex-shrink-0 text-rose-600" />
             <span>{error}</span>
           </div>
         )}
 
         {/* Section 1: Personal Information */}
-        <div className="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 space-y-4">
-          <h2 className="text-base font-bold text-slate-100 flex items-center">
-            <ShieldCheck className="w-5 h-5 text-sky-400 mr-2" /> Personal Information
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <h2 className="text-base font-bold text-slate-900 flex items-center">
+            <ShieldCheck className="w-5 h-5 text-blue-600 mr-2" /> Personal Information
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Full Name</label>
+              <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Full Name</label>
               <input
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-slate-100"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Phone</label>
+              <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Phone</label>
               <input
                 type="text"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-slate-100"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Location</label>
+              <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Location</label>
               <input
                 type="text"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-slate-100"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">GitHub URL</label>
+              <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">GitHub URL</label>
               <input
                 type="text"
                 value={githubUrl}
                 onChange={(e) => setGithubUrl(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-slate-100"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900"
               />
             </div>
           </div>
@@ -276,12 +276,12 @@ function ExtractionReviewContent() {
 
         {/* Section 2: AI Generated Summary */}
         {bioSummary && (
-          <div className="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 space-y-3">
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-slate-100 flex items-center">
-                <Sparkles className="w-5 h-5 text-sky-400 mr-2" /> Candidate Summary
+              <h2 className="text-base font-bold text-slate-900 flex items-center">
+                <Sparkles className="w-5 h-5 text-blue-600 mr-2" /> Candidate Summary
               </h2>
-              <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-sky-950 text-sky-400 border border-sky-800/50">
+              <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
                 AI-Generated Candidate Summary
               </span>
             </div>
@@ -289,16 +289,16 @@ function ExtractionReviewContent() {
               rows={3}
               value={bioSummary}
               onChange={(e) => setBioSummary(e.target.value)}
-              className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200"
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900"
             />
           </div>
         )}
 
         {/* Section 3: Extracted Skills */}
-        <div className="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 space-y-4">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-slate-100">Extracted Skills</h2>
-            <span className="text-xs text-slate-400">{skills.filter((s) => s.selected).length} selected</span>
+            <h2 className="text-base font-bold text-slate-900">Extracted Skills</h2>
+            <span className="text-xs text-slate-500">{skills.filter((s) => s.selected).length} selected</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -307,8 +307,8 @@ function ExtractionReviewContent() {
                 key={index}
                 className={`p-3 rounded-xl border transition flex items-center justify-between ${
                   skill.selected
-                    ? "bg-slate-950 border-sky-500/40"
-                    : "bg-slate-950/40 border-slate-800 opacity-60"
+                    ? "bg-slate-50 border-blue-300"
+                    : "bg-white border-slate-200 opacity-60"
                 }`}
               >
                 <div className="flex items-center space-x-3">
@@ -316,12 +316,12 @@ function ExtractionReviewContent() {
                     type="checkbox"
                     checked={skill.selected}
                     onChange={() => toggleSkill(index)}
-                    className="w-4 h-4 rounded text-sky-500 bg-slate-900 border-slate-700"
+                    className="w-4 h-4 rounded text-blue-600 bg-white border-slate-300"
                   />
                   <div>
-                    <p className="text-sm font-semibold text-slate-100">{skill.name}</p>
+                    <p className="text-sm font-semibold text-slate-900">{skill.name}</p>
                     {skill.evidence && (
-                      <p className="text-xs text-slate-400 truncate max-w-xs">&quot;{skill.evidence}&quot;</p>
+                      <p className="text-xs text-slate-500 truncate max-w-xs">&quot;{skill.evidence}&quot;</p>
                     )}
                   </div>
                 </div>
@@ -330,7 +330,7 @@ function ExtractionReviewContent() {
                   {renderConfidenceBadge(skill.confidence || 0.9)}
                   <button
                     onClick={() => removeSkill(index)}
-                    className="p-1 text-slate-500 hover:text-rose-400"
+                    className="p-1 text-slate-400 hover:text-rose-600"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -342,10 +342,10 @@ function ExtractionReviewContent() {
 
         {/* Section 4: Extracted Projects */}
         {projects.length > 0 && (
-          <div className="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 space-y-4">
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-slate-100">Extracted Projects</h2>
-              <span className="text-xs text-slate-400">{projects.filter((p) => p.selected).length} selected</span>
+              <h2 className="text-base font-bold text-slate-900">Extracted Projects</h2>
+              <span className="text-xs text-slate-500">{projects.filter((p) => p.selected).length} selected</span>
             </div>
 
             <div className="space-y-3">
@@ -354,8 +354,8 @@ function ExtractionReviewContent() {
                   key={index}
                   className={`p-4 rounded-xl border transition space-y-2 ${
                     proj.selected
-                      ? "bg-slate-950 border-sky-500/40"
-                      : "bg-slate-950/40 border-slate-800 opacity-60"
+                      ? "bg-slate-50 border-blue-300"
+                      : "bg-white border-slate-200 opacity-60"
                   }`}
                 >
                   <div className="flex items-center justify-between">
@@ -364,18 +364,18 @@ function ExtractionReviewContent() {
                         type="checkbox"
                         checked={proj.selected}
                         onChange={() => toggleProject(index)}
-                        className="w-4 h-4 rounded text-sky-500 bg-slate-900 border-slate-700"
+                        className="w-4 h-4 rounded text-blue-600 bg-white border-slate-300"
                       />
-                      <span className="text-sm font-bold text-slate-100">{proj.title}</span>
+                      <span className="text-sm font-bold text-slate-900">{proj.title}</span>
                     </div>
                     <button
                       onClick={() => removeProject(index)}
-                      className="p-1 text-slate-500 hover:text-rose-400"
+                      className="p-1 text-slate-400 hover:text-rose-600"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
-                  {proj.description && <p className="text-xs text-slate-400 pl-7">{proj.description}</p>}
+                  {proj.description && <p className="text-xs text-slate-600 pl-7">{proj.description}</p>}
                 </div>
               ))}
             </div>
@@ -383,10 +383,10 @@ function ExtractionReviewContent() {
         )}
 
         {/* Footer Confirmation Controls */}
-        <div className="flex justify-between items-center pt-4 border-t border-slate-800">
+        <div className="flex justify-between items-center pt-4 border-t border-slate-200">
           <button
             onClick={() => router.push("/onboarding/resume")}
-            className="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold rounded-xl"
+            className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl"
           >
             Re-upload Resume
           </button>
@@ -394,7 +394,7 @@ function ExtractionReviewContent() {
           <button
             onClick={handleConfirm}
             disabled={confirming}
-            className="flex items-center py-2.5 px-6 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm rounded-xl transition disabled:opacity-50"
+            className="flex items-center py-2.5 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm rounded-xl transition disabled:opacity-50 shadow-md shadow-emerald-600/20"
           >
             {confirming ? (
               <>

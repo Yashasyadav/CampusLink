@@ -1,32 +1,31 @@
-import React from "react";
+"use client";
 
-export default function HomePage() {
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/use-auth";
+import { Loader2 } from "lucide-react";
+
+export default function RootPage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) return;
+
+    if (!user) {
+      router.replace("/login");
+    } else if (!user.profile_completed) {
+      router.replace("/onboarding");
+    } else {
+      router.replace("/discover");
+    }
+  }, [user, loading, router]);
+
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen p-8 text-center bg-slate-950 text-slate-100">
-      <div className="max-w-3xl space-y-6">
-        <div className="inline-block px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-widest bg-sky-950 text-sky-400 border border-sky-800/50">
-          Enterprise Foundation — Phase 1
-        </div>
-        <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-400 bg-clip-text text-transparent">
-          CampusLink AI
-        </h1>
-        <p className="text-lg text-slate-400 max-w-2xl mx-auto">
-          Agentic campus expertise and knowledge discovery platform.
-        </p>
-        <div className="pt-6 grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs font-mono text-slate-500">
-          <div className="p-3 rounded-lg border border-slate-800 bg-slate-900/50">
-            Problem Understanding
-          </div>
-          <div className="p-3 rounded-lg border border-slate-800 bg-slate-900/50">
-            Evidence Discovery
-          </div>
-          <div className="p-3 rounded-lg border border-slate-800 bg-slate-900/50">
-            Intelligent Matching
-          </div>
-          <div className="p-3 rounded-lg border border-slate-800 bg-slate-900/50">
-            Connection
-          </div>
-        </div>
+    <main className="flex items-center justify-center min-h-screen bg-slate-50 text-slate-500">
+      <div className="flex items-center gap-3 text-sm font-medium">
+        <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+        <span>Resolving CampusLink session...</span>
       </div>
     </main>
   );

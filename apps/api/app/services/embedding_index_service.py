@@ -157,6 +157,7 @@ class EmbeddingIndexService:
 
         for etype in allowed_types:
             records = self._get_all_entities_of_type(db, etype)
+            logger.info(f"DEBUG REINDEX {etype}: found {len(records)} records")
             report.total_records += len(records)
 
             for item in records:
@@ -175,6 +176,7 @@ class EmbeddingIndexService:
                     else:
                         report.skipped_records += 1
                 except Exception as exc:
+                    db.rollback()
                     logger.error(f"Error indexing {etype}:{e_id}: {exc}")
                     report.failed_records += 1
                     report.errors.append(f"{etype}:{e_id} -> {str(exc)}")
@@ -215,15 +217,15 @@ class EmbeddingIndexService:
 
     def _get_all_entities_of_type(self, db: Session, entity_type: str) -> List[Any]:
         if entity_type == "PROFILE":
-            return db.scalars(select(Profile).where(Profile.searchable == True)).all()
+            return list(db.scalars(select(Profile).where(Profile.searchable == True)).all())
         elif entity_type == "PROJECT":
-            return db.scalars(select(Project)).all()
+            return list(db.scalars(select(Project)).all())
         elif entity_type == "RESEARCH":
-            return db.scalars(select(ResearchItem)).all()
+            return list(db.scalars(select(ResearchItem)).all())
         elif entity_type == "FACILITY":
-            return db.scalars(select(Facility)).all()
+            return list(db.scalars(select(Facility)).all())
         elif entity_type == "EQUIPMENT":
-            return db.scalars(select(Equipment)).all()
+            return list(db.scalars(select(Equipment)).all())
         elif entity_type == "PROBLEM_SOLUTION":
-            return db.scalars(select(ProblemSolution)).all()
+            return list(db.scalars(select(ProblemSolution)).all())
         return []
