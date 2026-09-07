@@ -43,12 +43,19 @@ class QueryUnderstandingAgent:
                     filtered_domains.append(d)
 
             result.domain = filtered_domains
+            if not result.problem_summary:
+                result.problem_summary = query.strip()[:150]
+            if not result.diagnostic_areas:
+                result.diagnostic_areas = [t for t in (result.technologies + result.skills)[:3]] or ["Technical Guidance"]
+
             return result
         except Exception as exc:
             logger.error(f"Query understanding parsing failed: {exc}")
             # Fallback
             return QueryUnderstandingResult(
                 original_query=query.strip(),
+                problem_summary=query.strip()[:150],
+                diagnostic_areas=["Technical Investigation"],
                 intent=IntentEnum.GENERAL_CAMPUS_DISCOVERY,
                 needs_people=True,
                 needs_projects=True,

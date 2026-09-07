@@ -59,6 +59,125 @@ def get_profile_tool(db: Any, current_user: User, user_id: uuid.UUID) -> Optiona
     }
 
 
+def get_person_evidence_graph_tool(db: Any, current_user: User, target_user_id: uuid.UUID) -> Dict[str, Any]:
+    """Tool: Fetch DB-backed contribution and evidence graph for a candidate user."""
+    from app.models.skills import UserSkill
+    from app.models.projects import ProjectContributor, Project
+    from app.models.research import ResearchAuthor, ResearchItem
+    from app.models.knowledge import ProblemSolution
+    from app.models.facilities import Facility
+
+    # 1. User Skills
+    user_skills = []
+    us_rows = db.query(UserSkill).filter(UserSkill.user_id == target_user_id).all()
+    for us in us_rows:
+        if hasattr(us, "skill") and us.skill and hasattr(us.skill, "name"):
+            user_skills.append(us.skill.name)
+
+    # 2. Contributed & Owned Projects
+    projects = []
+    seen_proj = set()
+    contrib_rows = db.query(ProjectContributor).filter(ProjectContributor.user_id == target_user_id).all()
+    for c in contrib_rows:
+        proj = db.get(Project, c.project_id)
+        if proj and proj.id not in seen_proj:
+            vis = proj.visibility.value if hasattr(proj.visibility, "value") else str(proj.visibility)
+            if vis != "PRIVATE" or proj.created_by == current_user.id or target_user_id == current_user.id:
+                seen_proj.add(proj.id)
+                role_str = c.role.value if hasattr(c.role, "value") else str(c.role)
+                techs = [t.technology_name for t in getattr(proj, "technologies", [])] if hasattr(proj, "technologies") else []
+                projects.append({
+                    "project_id": str(proj.id),
+                    "title": proj.title,
+                    "role": role_str,
+                    "snippet": (c.contribution_description or proj.description or "")[:150],
+                    "technologies": techs,
+                })
+
+    owned_projs = db.query(Project).filter(Project.created_by == target_user_id).all()
+    for proj in owned_projs:
+        if proj.id not in seen_proj:
+            vis = proj.visibility.value if hasattr(proj.visibility, "value") else str(proj.visibility)
+            if vis != "PRIVATE" or proj.created_by == current_user.id:
+                seen_proj.add(proj.id)
+                techs = [t.technology_name for t in getattr(proj, "technologies", [])] if hasattr(proj, "technologies") else []
+                projects.append({
+                    "project_id": str(proj.id),
+                    "title": proj.title,
+                    "role": "Owner / Lead",
+                    "snippet": (proj.description or "")[:150],
+                    "technologies": techs,
+                })
+
+    # 3. Authored Solutions
+    solutions = []
+    sol_rows = db.query(ProblemSolution).filter(ProblemSolution.author_id == target_user_id).all()
+    for ps in sol_rows:
+        vis = ps.visibility.value if hasattr(ps.visibility, "value") else str(ps.visibility)
+        if vis != "PRIVATE" or ps.author_id == current_user.id:
+            techs = [t.technology_name for t in getattr(ps, "technologies", [])] if hasattr(ps, "technologies") else []
+            solutions.append({
+                "solution_id": str(ps.id),
+                "title": ps.title,
+                "summary": (ps.solution or ps.outcome or ps.problem or "")[:150],
+                "technologies": techs,
+            })
+
+    # 4. Research Publications
+    research = []
+    seen_res = set()
+    ra_rows = db.query(ResearchAuthor).filter(ResearchAuthor.user_id == target_user_id).all()
+    for ra in ra_rows:
+        res_item = db.get(ResearchItem, ra.research_id)
+        if res_item and res_item.id not in seen_res:
+            vis = res_item.visibility.value if hasattr(res_item.visibility, "value") else str(res_item.visibility)
+            if vis != "PRIVATE" or res_item.owner_id == current_user.id or target_user_id == current_user.id:
+                seen_res.add(res_item.id)
+                pub_str = res_item.publication_type.value if hasattr(res_item.publication_type, "value") else str(res_item.publication_type)
+                research.append({
+                    "research_id": str(res_item.id),
+                    "title": res_item.title,
+                    "publication_type": pub_str,
+                    "abstract": (res_item.abstract or "")[:150],
+                })
+
+    owned_res = db.query(ResearchItem).filter(ResearchItem.owner_id == target_user_id).all()
+    for res_item in owned_res:
+        if res_item.id not in seen_res:
+            vis = res_item.visibility.value if hasattr(res_item.visibility, "value") else str(res_item.visibility)
+            if vis != "PRIVATE" or res_item.owner_id == current_user.id:
+                seen_res.add(res_item.id)
+                pub_str = res_item.publication_type.value if hasattr(res_item.publication_type, "value") else str(res_item.publication_type)
+                research.append({
+                    "research_id": str(res_item.id),
+                    "title": res_item.title,
+                    "publication_type": pub_str,
+                    "abstract": (res_item.abstract or "")[:150],
+                })
+
+    # 5. Responsible Facilities
+    facilities = []
+    fac_rows = db.query(Facility).filter(Facility.responsible_user_id == target_user_id).all()
+    for fac in fac_rows:
+        facilities.append({
+            "facility_id": str(fac.id),
+            "name": fac.name,
+            "location": fac.location or fac.department or "",
+        })
+
+    ev_count = len(user_skills) + len(projects) + len(solutions) + len(research) + len(facilities)
+
+    return {
+        "user_id": str(target_user_id),
+        "skills": user_skills,
+        "projects": projects,
+        "solutions": solutions,
+        "research": research,
+        "facilities": facilities,
+        "evidence_count": ev_count,
+    }
+
+
 def search_projects_tool(
     db: Any, current_user: User, query: str, limit: int = 5
 ) -> SearchResponse:
@@ -114,7 +233,7 @@ def get_research_tool(db: Any, current_user: User, research_id: uuid.UUID) -> Op
         return None
 
     vis = res.visibility.value if hasattr(res.visibility, "value") else str(res.visibility)
-    if vis == "PRIVATE" and res.created_by_id != current_user.id:
+    if vis == "PRIVATE" and res.owner_id != current_user.id:
         return None
 
     return {

@@ -33,8 +33,9 @@ class ScoringService:
         candidate_skills: List[str],
         query_technologies: List[str],
         candidate_technologies: List[str],
-        has_project_evidence: bool,
-        has_solution_evidence: bool,
+        has_project_evidence: bool = False,
+        has_solution_evidence: bool = False,
+        has_research_evidence: bool = False,
         best_evidence_type: str = "PROFILE",
     ) -> Tuple[float, str, str, Dict[str, float]]:
         """
@@ -43,7 +44,7 @@ class ScoringService:
         Returns:
             Tuple of (final_score, relevance_level, evidence_strength, breakdown_dict)
         """
-        # 1. Semantic relevance (0.0 to 1.0)
+        # 1. Semantic / problem statement relevance (0.0 to 1.0)
         raw_sem = float(semantic_relevance)
         if 0.0 < raw_sem < 0.35:
             s_semantic = max(0.0, min(1.0, raw_sem * 4.0))
@@ -74,17 +75,17 @@ class ScoringService:
         # 5. Solution evidence
         s_solution = 1.0 if has_solution_evidence else 0.0
 
-        # 6. Evidence quality
-        s_evidence = EVIDENCE_QUALITY_HIERARCHY.get(best_evidence_type.upper(), 0.35)
+        # 6. Research evidence
+        s_research = 1.0 if has_research_evidence else 0.0
 
-        # Weighted Sum
+        # Person-centric Weighted Sum: 25% problem relevance, 20% skills, 15% tech, 15% projects, 15% solutions, 10% research
         final_score = (
-            self.weights["semantic_relevance"] * s_semantic
-            + self.weights["skill_overlap"] * s_skill
-            + self.weights["technology_overlap"] * s_tech
-            + self.weights["project_evidence"] * s_project
-            + self.weights["solution_evidence"] * s_solution
-            + self.weights["evidence_quality"] * s_evidence
+            0.25 * s_semantic
+            + 0.20 * s_skill
+            + 0.15 * s_tech
+            + 0.15 * s_project
+            + 0.15 * s_solution
+            + 0.10 * s_research
         )
         final_score = round(max(0.0, min(1.0, final_score)), 4)
 
@@ -92,7 +93,8 @@ class ScoringService:
         relevance_level = self.get_relevance_level(final_score)
 
         # Determine evidence strength label
-        evidence_strength = self.get_evidence_strength(s_evidence, final_score)
+        s_ev_quality = EVIDENCE_QUALITY_HIERARCHY.get(best_evidence_type.upper(), 0.35)
+        evidence_strength = self.get_evidence_strength(s_ev_quality, final_score)
 
         breakdown = {
             "semantic_relevance": s_semantic,
@@ -100,7 +102,7 @@ class ScoringService:
             "technology_overlap": s_tech,
             "project_evidence": s_project,
             "solution_evidence": s_solution,
-            "evidence_quality": s_evidence,
+            "research_evidence": s_research,
             "final_score": final_score,
         }
 
@@ -109,22 +111,22 @@ class ScoringService:
     @staticmethod
     def get_relevance_level(score: float) -> str:
         """Map normalized score (0.0 to 1.0) to user-facing relevance text without fake precision."""
-        if score >= 0.85:
+        if score >= 0.80:
             return "High relevance"
-        elif score >= 0.70:
+        elif score >= 0.65:
             return "Strong match"
-        elif score >= 0.50:
+        elif score >= 0.45:
             return "Relevant"
         else:
             return "Potential match"
 
     @staticmethod
     def get_evidence_strength(evidence_quality_score: float, final_score: float) -> str:
-        """Classify evidence strength."""
+        """Classify evidence strength into standard label string."""
         combined = (evidence_quality_score + final_score) / 2.0
-        if combined >= 0.75:
-            return "Strong"
-        elif combined >= 0.50:
-            return "Moderate"
+        if combined >= 0.65:
+            return "Strong evidence"
+        elif combined >= 0.45:
+            return "Moderate evidence"
         else:
-            return "Basic"
+            return "Basic evidence"

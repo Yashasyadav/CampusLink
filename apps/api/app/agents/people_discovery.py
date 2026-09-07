@@ -1,7 +1,7 @@
 import logging
 from typing import Optional, List, Any
 from app.models.users import User
-from app.agent_tools.tools import search_people_tool, get_profile_tool
+from app.agent_tools.tools import search_people_tool, get_profile_tool, get_person_evidence_graph_tool
 from app.schemas.agents import (
     PeopleDiscoveryResult,
     PeopleCandidate,
@@ -34,24 +34,43 @@ class PeopleDiscoveryAgent:
             candidates: List[PeopleCandidate] = []
 
             for item in search_res.results:
+                # Exclude current authenticated user
+                if item.entity_id == current_user.id:
+                    continue
+
                 # 2. Get profile details via tool
                 profile_info = get_profile_tool(db, current_user, item.entity_id)
                 if not profile_info:
                     continue
+                if profile_info.get("user_id") == current_user.id:
+                    continue
 
-                profile_skills = [s.lower() for s in profile_info.get("skills", [])]
-                profile_text = f"{profile_info.get('bio') or ''} {' '.join(profile_info.get('skills', []))}".lower()
+                # 3. Get structured DB evidence graph
+                ev_graph = get_person_evidence_graph_tool(db, current_user, item.entity_id)
+
+                # Combine skills and text across profile & graph for matching
+                graph_skills = [s.lower() for s in ev_graph.get("skills", [])]
+                graph_techs = []
+                for p in ev_graph.get("projects", []):
+                    graph_techs.extend([t.lower() for t in p.get("technologies", [])])
+                for s in ev_graph.get("solutions", []):
+                    graph_techs.extend([t.lower() for t in s.get("technologies", [])])
+
+                profile_skills = [s.lower() for s in profile_info.get("skills", [])] + graph_skills
+                profile_text = f"{profile_info.get('bio') or ''} {' '.join(profile_skills)} {' '.join(graph_techs)}".lower()
 
                 # Match query skills
                 matched_skills = [
                     s for s in query_understanding.skills
                     if s.lower() in profile_skills or s.lower() in profile_text
                 ]
+                if not matched_skills and profile_skills:
+                    matched_skills = [profile_info.get("skills", [])[0]] if profile_info.get("skills") else []
 
                 # Match query technologies
                 matched_tech = [
                     t for t in query_understanding.technologies
-                    if t.lower() in profile_skills or t.lower() in profile_text
+                    if t.lower() in profile_skills or t.lower() in graph_techs or t.lower() in profile_text
                 ]
 
                 evidence_item = Evidence(
@@ -67,8 +86,11 @@ class PeopleDiscoveryAgent:
                     user_id=profile_info["user_id"],
                     display_name=profile_info["full_name"],
                     department=profile_info.get("department"),
-                    matched_skills=matched_skills,
+                    matched_skills=list(dict.fromkeys(matched_skills)),
+                    matched_technologies=list(dict.fromkeys(matched_tech)),
                     evidence=[evidence_item],
+                    person_evidence_graph=ev_graph,
+                    evidence_count=ev_graph.get("evidence_count", 0),
                 )
                 candidates.append(candidate)
 

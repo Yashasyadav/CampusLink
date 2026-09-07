@@ -17,7 +17,9 @@ export interface MatchingResult {
   matched_technologies: string[];
   matched_domains: string[];
   supporting_evidence: EvidenceItem[];
-  evidence_strength: "Strong" | "Moderate" | "Basic";
+  evidence_strength: "Strong evidence" | "Moderate evidence" | "Basic evidence" | string;
+  evidence_count?: number;
+  person_evidence_graph?: Record<string, any>;
   explanation: string;
   help_type?: string | null;
   strengths: string[];
@@ -46,9 +48,11 @@ export interface HelpChain {
 
 export interface QueryUnderstanding {
   original_query: string;
+  problem_summary?: string;
   domain: string[];
   skills: string[];
   technologies: string[];
+  diagnostic_areas?: string[];
   problem_keywords: string[];
   intent: string;
   needs_people: boolean;

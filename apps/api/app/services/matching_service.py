@@ -59,10 +59,17 @@ class MatchingService:
         top_people: List[MatchingResult] = []
         if discovery.people and discovery.people.candidates:
             for cand in discovery.people.candidates:
+                # Ensure current authenticated user is strictly excluded
+                if str(cand.user_id) == str(current_user.id):
+                    continue
+
                 c_skills = cand.matched_skills
-                c_tech = []
-                has_proj = any(e.entity_type.upper() == "PROJECT" for e in cand.evidence)
-                has_sol = any(e.entity_type.upper() == "PROBLEM_SOLUTION" for e in cand.evidence)
+                c_tech = cand.matched_technologies
+                ev_graph = cand.person_evidence_graph or {}
+
+                has_proj = bool(ev_graph.get("projects")) or any(e.entity_type.upper() == "PROJECT" for e in cand.evidence)
+                has_sol = bool(ev_graph.get("solutions")) or any(e.entity_type.upper() == "PROBLEM_SOLUTION" for e in cand.evidence)
+                has_res = bool(ev_graph.get("research"))
                 
                 # Base semantic score from top evidence item
                 raw_score = cand.evidence[0].score if cand.evidence else 0.50
@@ -75,7 +82,8 @@ class MatchingService:
                     candidate_technologies=c_tech,
                     has_project_evidence=has_proj,
                     has_solution_evidence=has_sol,
-                    best_evidence_type="PROBLEM_SOLUTION" if has_sol else ("PROJECT" if has_proj else "PROFILE"),
+                    has_research_evidence=has_res,
+                    best_evidence_type="PROBLEM_SOLUTION" if has_sol else ("PROJECT" if has_proj else ("RESEARCH" if has_res else "PROFILE")),
                 )
 
                 if score < MIN_RELEVANCE_THRESHOLD:
@@ -112,6 +120,8 @@ class MatchingService:
                         matched_domains=q_domains,
                         supporting_evidence=formatted_ev,
                         evidence_strength=ev_strength,
+                        evidence_count=cand.evidence_count or ev_graph.get("evidence_count", len(formatted_ev)),
+                        person_evidence_graph=ev_graph,
                         explanation=explanation,
                         help_type=help_type,
                         strengths=strengths,
@@ -429,18 +439,18 @@ class MatchingService:
         if is_single_sufficient or len(required_capabilities) <= 1:
             node = HelpChainNode(
                 step_number=1,
-                focus_area=", ".join(required_capabilities[:3]),
+                focus_area="Best Single-Person Match",
                 candidate_id=top_cand.candidate_id,
                 candidate_name=top_cand.title,
                 candidate_type=top_cand.candidate_type,
-                reason=f"Primary candidate covers core technical requirements ({', '.join(top_cand.matched_skills[:2]) or 'Domain Expertise'}).",
+                reason=f"Primary expert demonstrates comprehensive coverage for your technical problem ({', '.join(top_cand.matched_skills[:2] + top_cand.matched_technologies[:2]) or 'Domain Expertise'}).",
                 matched_skills=top_cand.matched_skills,
             )
             return HelpChain(
                 needed_capabilities=required_capabilities,
                 covered_capabilities=top_cand.matched_skills or required_capabilities,
                 nodes=[node],
-                explanation="Primary candidate demonstrates comprehensive coverage for the problem requirements.",
+                explanation=f"Best Single-Person Match: {top_cand.title} has direct experience covering key technical requirements for this issue.",
                 is_single_candidate_sufficient=True,
             )
 
@@ -481,6 +491,6 @@ class MatchingService:
             needed_capabilities=required_capabilities,
             covered_capabilities=covered_list if covered_list else required_capabilities,
             nodes=nodes,
-            explanation=f"Your problem spans {len(nodes)} distinct technical areas. CampusLink identified a potential expertise chain across complementary campus members.",
+            explanation=f"Potential Expertise Chain: Your problem spans {len(nodes)} distinct technical areas. CampusLink identified a potential expertise chain across complementary campus members.",
             is_single_candidate_sufficient=False,
         )

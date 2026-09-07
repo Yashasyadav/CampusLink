@@ -167,15 +167,15 @@ function DiscoverContent() {
         <div className="space-y-10 animate-fade-in">
 
           {/* AI UNDERSTANDING SECTION */}
-          <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-card">
-            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+          <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-card space-y-4">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
                   <Tag className="w-4 h-4 text-blue-600" />
                 </div>
                 <div>
                   <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">AI Understanding</h2>
-                  <p className="text-xs text-slate-500">Normalized requirements & extracted matching dimensions</p>
+                  <p className="text-xs text-slate-500">Normalized problem summary & extracted matching dimensions</p>
                 </div>
               </div>
               <span className="px-3 py-1 text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100 rounded-lg">
@@ -183,7 +183,14 @@ function DiscoverContent() {
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-[13px]">
+            {matchingData.understanding.problem_summary && (
+              <div className="p-3.5 rounded-xl bg-blue-50/60 border border-blue-100 text-xs text-slate-800">
+                <span className="font-bold text-blue-900">Core Issue Summary: </span>
+                {matchingData.understanding.problem_summary}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 text-[13px]">
               <div>
                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">Domains</p>
                 <div className="flex flex-wrap gap-1.5">
@@ -214,6 +221,16 @@ function DiscoverContent() {
                   ) : <span className="text-slate-400 italic">None specified</span>}
                 </div>
               </div>
+              <div>
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">Diagnostic Areas</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {(matchingData.understanding.diagnostic_areas && matchingData.understanding.diagnostic_areas.length > 0) ? (
+                    matchingData.understanding.diagnostic_areas.map((da, i) => (
+                      <span key={i} className="px-2.5 py-1 rounded-lg bg-purple-50 border border-purple-200 text-purple-700 font-medium">{da}</span>
+                    ))
+                  ) : <span className="text-slate-400 italic">General Investigation</span>}
+                </div>
+              </div>
             </div>
           </section>
 
@@ -222,9 +239,9 @@ function DiscoverContent() {
             <HelpChainSection helpChain={matchingData.help_chain} />
           )}
 
-          {/* TOP PEOPLE CANDIDATES */}
+          {/* PEOPLE WHO CAN HELP */}
           <section>
-            <SectionHeader icon={User} iconColor="text-blue-600" iconBg="bg-blue-50" title="Top People" count={matchingData.top_people.length} />
+            <SectionHeader icon={User} iconColor="text-blue-600" iconBg="bg-blue-50" title="People Who Can Help" count={matchingData.top_people.length} />
             {matchingData.top_people.length === 0 ? (
               <EmptyCategoryMessage message="No public campus members with matching evidence found for this query." />
             ) : (
@@ -326,6 +343,7 @@ function DiscoverContent() {
 
 {/* ── HELP CHAIN COMPONENT ── */}
 function HelpChainSection({ helpChain }: { helpChain: HelpChain }) {
+  const isSingle = helpChain.is_single_candidate_sufficient;
   return (
     <section className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white rounded-2xl p-6 md:p-8 shadow-xl">
       <div className="flex items-center gap-3 mb-4">
@@ -333,11 +351,15 @@ function HelpChainSection({ helpChain }: { helpChain: HelpChain }) {
           <Network className="w-5 h-5" />
         </div>
         <div>
-          <h2 className="text-base font-extrabold text-white">Potential Expertise Chain</h2>
-          <p className="text-xs text-blue-200">Multi-domain capability coverage across campus experts</p>
+          <h2 className="text-base font-extrabold text-white">
+            {isSingle ? "Best Single-Person Match" : "Potential Expertise Chain"}
+          </h2>
+          <p className="text-xs text-blue-200">
+            {isSingle ? "Primary expert covering core technical requirements" : "Multi-domain capability coverage across campus experts"}
+          </p>
         </div>
         <span className="ml-auto px-3 py-1 rounded-full bg-orange-500/20 border border-orange-400/30 text-orange-300 text-xs font-bold">
-          {helpChain.is_single_candidate_sufficient ? "Single Match" : `${helpChain.nodes.length}-Person Chain`}
+          {isSingle ? "Best Single Match" : `${helpChain.nodes.length}-Person Chain`}
         </span>
       </div>
 
@@ -487,6 +509,41 @@ function CandidateCard({ item, href, actionLabel, isSolution = false }: { item: 
                       </li>
                     ))}
                   </ul>
+                </div>
+              )}
+
+              {item.person_evidence_graph && (
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Verified Evidence Graph</p>
+                    <span className="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md">
+                      {item.person_evidence_graph.evidence_count || item.evidence_count || 0} Sources
+                    </span>
+                  </div>
+                  {item.person_evidence_graph.projects?.length > 0 && (
+                    <div className="text-[11px] text-slate-700">
+                      <span className="font-semibold text-slate-900">Projects: </span>
+                      {item.person_evidence_graph.projects.map((p: any) => p.title).join(", ")}
+                    </div>
+                  )}
+                  {item.person_evidence_graph.solutions?.length > 0 && (
+                    <div className="text-[11px] text-slate-700">
+                      <span className="font-semibold text-slate-900">Past Solutions: </span>
+                      {item.person_evidence_graph.solutions.map((s: any) => s.title).join(", ")}
+                    </div>
+                  )}
+                  {item.person_evidence_graph.research?.length > 0 && (
+                    <div className="text-[11px] text-slate-700">
+                      <span className="font-semibold text-slate-900">Research: </span>
+                      {item.person_evidence_graph.research.map((r: any) => r.title).join(", ")}
+                    </div>
+                  )}
+                  {item.person_evidence_graph.facilities?.length > 0 && (
+                    <div className="text-[11px] text-slate-700">
+                      <span className="font-semibold text-slate-900">Labs: </span>
+                      {item.person_evidence_graph.facilities.map((f: any) => f.name).join(", ")}
+                    </div>
+                  )}
                 </div>
               )}
 

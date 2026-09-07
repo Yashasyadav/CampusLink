@@ -26,9 +26,11 @@ class Evidence(BaseModel):
 
 class QueryUnderstandingResult(BaseModel):
     original_query: str = Field(..., description="Input user request")
+    problem_summary: str = Field(default="", description="Concise statement of core user problem")
     domain: List[str] = Field(default=[], description="Extracted academic or technical domains")
     skills: List[str] = Field(default=[], description="Extracted relevant skills")
     technologies: List[str] = Field(default=[], description="Extracted relevant technologies or hardware")
+    diagnostic_areas: List[str] = Field(default=[], description="Extracted diagnostic sub-problems or investigation areas")
     problem_keywords: List[str] = Field(default=[], description="Extracted problem/symptom keywords")
     intent: IntentEnum = Field(default=IntentEnum.GENERAL_CAMPUS_DISCOVERY, description="Structured query intent classification")
     needs_people: bool = Field(default=True, description="Whether people discovery agent should be invoked")
@@ -42,7 +44,10 @@ class PeopleCandidate(BaseModel):
     display_name: str = Field(..., description="User display name")
     department: Optional[str] = Field(default=None, description="Department name")
     matched_skills: List[str] = Field(default=[], description="List of skills matching query")
+    matched_technologies: List[str] = Field(default=[], description="List of technologies matching query")
     evidence: List[Evidence] = Field(default=[], description="Supporting evidence items")
+    person_evidence_graph: Dict[str, Any] = Field(default={}, description="Structured DB-backed contribution graph")
+    evidence_count: int = Field(default=0, description="Total evidence sources count")
 
 
 class PeopleDiscoveryResult(BaseModel):
