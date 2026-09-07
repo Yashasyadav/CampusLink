@@ -300,9 +300,10 @@ def node_rank_matches(state: DiscoveryGraphState, config: RunnableConfig = None)
         raw_ev = cand.get("evidence", [])
         has_proj = any(e.get("entity_type", "").upper() == "PROJECT" for e in raw_ev)
         has_sol = any(e.get("entity_type", "").upper() == "PROBLEM_SOLUTION" for e in raw_ev)
+        raw_score = float(raw_ev[0].get("score") if raw_ev else 0.50)
 
         score, lvl, ev_str, _ = scoring_service.calculate_score(
-            semantic_relevance=0.85,
+            semantic_relevance=raw_score,
             query_skills=q_skills,
             candidate_skills=c_skills,
             query_technologies=q_tech,
@@ -310,6 +311,9 @@ def node_rank_matches(state: DiscoveryGraphState, config: RunnableConfig = None)
             has_project_evidence=has_proj,
             has_solution_evidence=has_sol,
         )
+
+        if score < 0.25:
+            continue
 
         top_people.append({
             "candidate_id": str(cand.get("user_id")),
@@ -324,7 +328,7 @@ def node_rank_matches(state: DiscoveryGraphState, config: RunnableConfig = None)
             "evidence_strength": ev_str,
             "supporting_evidence": cand.get("evidence", []),
             "explanation": f"{lvl} match based on shared technical expertise.",
-            "strengths": [f"Skills: {', '.join(c_skills[:3])}"],
+            "strengths": [f"Skills: {', '.join(c_skills[:3])}"] if c_skills else ["Campus Profile"],
             "limitations": [],
         })
 
@@ -337,8 +341,10 @@ def node_rank_matches(state: DiscoveryGraphState, config: RunnableConfig = None)
         title = proj.get("title", "Campus Project")
         skills = proj.get("skills", [])
         tech = proj.get("technologies", [])
+        score_raw = float(proj.get("score") or proj.get("relevance") or 0.50)
+
         score, lvl, ev_str, _ = scoring_service.calculate_score(
-            semantic_relevance=0.80,
+            semantic_relevance=score_raw,
             query_skills=q_skills,
             candidate_skills=skills,
             query_technologies=q_tech,
@@ -347,6 +353,10 @@ def node_rank_matches(state: DiscoveryGraphState, config: RunnableConfig = None)
             has_solution_evidence=False,
             best_evidence_type="PROJECT",
         )
+
+        if score < 0.35:
+            continue
+
         top_projects.append({
             "candidate_id": proj_id,
             "candidate_type": "PROJECT",
@@ -360,7 +370,7 @@ def node_rank_matches(state: DiscoveryGraphState, config: RunnableConfig = None)
             "evidence_strength": ev_str,
             "supporting_evidence": [],
             "explanation": f"{lvl} as a similar campus project.",
-            "strengths": [f"Technologies: {', '.join(tech[:3])}"],
+            "strengths": [f"Technologies: {', '.join(tech[:3])}"] if tech else ["Campus Project"],
             "limitations": [],
         })
 

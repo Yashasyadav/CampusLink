@@ -42,6 +42,12 @@ def get_profile_tool(db: Any, current_user: User, user_id: uuid.UUID) -> Optiona
     if not profile or not profile.searchable:
         return None
 
+    # Fetch user skills from relation
+    user_skills = []
+    user_obj = db.get(User, user_id)
+    if user_obj and hasattr(user_obj, "user_skills") and user_obj.user_skills:
+        user_skills = [us.skill.name for us in user_obj.user_skills if us.skill]
+
     return {
         "user_id": profile.user_id,
         "full_name": profile.full_name,
@@ -49,6 +55,7 @@ def get_profile_tool(db: Any, current_user: User, user_id: uuid.UUID) -> Optiona
         "designation": profile.designation,
         "bio": profile.bio,
         "location": profile.location,
+        "skills": user_skills,
     }
 
 

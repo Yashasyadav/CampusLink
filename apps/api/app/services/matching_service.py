@@ -17,6 +17,9 @@ from app.services.explanation_service import ExplanationService
 logger = logging.getLogger(__name__)
 
 
+MIN_RELEVANCE_THRESHOLD = 0.25
+
+
 class MatchingService:
     """
     Main orchestration service for Phase 8 Matching & Explanation Intelligence.
@@ -57,12 +60,12 @@ class MatchingService:
         if discovery.people and discovery.people.candidates:
             for cand in discovery.people.candidates:
                 c_skills = cand.matched_skills
-                c_tech = []  # Extracted from meta/evidence if any
+                c_tech = []
                 has_proj = any(e.entity_type.upper() == "PROJECT" for e in cand.evidence)
                 has_sol = any(e.entity_type.upper() == "PROBLEM_SOLUTION" for e in cand.evidence)
                 
                 # Base semantic score from top evidence item
-                raw_score = cand.evidence[0].score if cand.evidence else 0.75
+                raw_score = cand.evidence[0].score if cand.evidence else 0.50
 
                 score, relevance_level, ev_strength, _ = self.scoring_service.calculate_score(
                     semantic_relevance=raw_score,
@@ -74,6 +77,9 @@ class MatchingService:
                     has_solution_evidence=has_sol,
                     best_evidence_type="PROBLEM_SOLUTION" if has_sol else ("PROJECT" if has_proj else "PROFILE"),
                 )
+
+                if score < MIN_RELEVANCE_THRESHOLD:
+                    continue
 
                 formatted_ev = self.evidence_service.format_evidence_items(
                     candidate_id=str(cand.user_id),
@@ -123,7 +129,7 @@ class MatchingService:
                 title = proj.get("title", "Campus Project")
                 technologies = proj.get("technologies", [])
                 skills = proj.get("skills", [])
-                score_raw = float(proj.get("score") or proj.get("relevance", 0.80))
+                score_raw = float(proj.get("score") or proj.get("relevance") or 0.50)
 
                 score, relevance_level, ev_strength, _ = self.scoring_service.calculate_score(
                     semantic_relevance=score_raw,
@@ -135,6 +141,9 @@ class MatchingService:
                     has_solution_evidence=False,
                     best_evidence_type="PROJECT",
                 )
+
+                if score < MIN_RELEVANCE_THRESHOLD:
+                    continue
 
                 matching_ev = [e for e in discovery.evidence if str(e.entity_id) == proj_id]
                 formatted_ev = self.evidence_service.format_evidence_items(
@@ -183,7 +192,7 @@ class MatchingService:
             for sol in discovery.projects.solutions:
                 sol_id = str(sol.get("id") or sol.get("solution_id", ""))
                 title = sol.get("title") or sol.get("problem_title") or "Campus Solution Record"
-                score_raw = float(sol.get("score") or sol.get("relevance", 0.85))
+                score_raw = float(sol.get("score") or sol.get("relevance") or 0.50)
 
                 score, relevance_level, ev_strength, _ = self.scoring_service.calculate_score(
                     semantic_relevance=score_raw,
@@ -195,6 +204,9 @@ class MatchingService:
                     has_solution_evidence=True,
                     best_evidence_type="PROBLEM_SOLUTION",
                 )
+
+                if score < MIN_RELEVANCE_THRESHOLD:
+                    continue
 
                 matching_ev = [e for e in discovery.evidence if str(e.entity_id) == sol_id]
                 formatted_ev = self.evidence_service.format_evidence_items(
@@ -243,7 +255,7 @@ class MatchingService:
             for item in discovery.projects.research:
                 item_id = str(item.get("id") or item.get("research_id", ""))
                 title = item.get("title", "Campus Research Paper")
-                score_raw = float(item.get("score") or item.get("relevance", 0.75))
+                score_raw = float(item.get("score") or item.get("relevance") or 0.50)
 
                 score, relevance_level, ev_strength, _ = self.scoring_service.calculate_score(
                     semantic_relevance=score_raw,
@@ -255,6 +267,9 @@ class MatchingService:
                     has_solution_evidence=False,
                     best_evidence_type="RESEARCH",
                 )
+
+                if score < MIN_RELEVANCE_THRESHOLD:
+                    continue
 
                 formatted_ev = self.evidence_service.format_evidence_items(
                     candidate_id=item_id,
@@ -304,7 +319,7 @@ class MatchingService:
                 fac_id = str(fac.get("id") or fac.get("facility_id", ""))
                 title = fac.get("name") or fac.get("title") or "Campus Laboratory"
                 dept = fac.get("department") or fac.get("location") or "Hardware Asset"
-                score_raw = float(fac.get("score") or fac.get("relevance", 0.70))
+                score_raw = float(fac.get("score") or fac.get("relevance") or 0.50)
 
                 score, relevance_level, ev_strength, _ = self.scoring_service.calculate_score(
                     semantic_relevance=score_raw,
@@ -316,6 +331,9 @@ class MatchingService:
                     has_solution_evidence=False,
                     best_evidence_type="FACILITY",
                 )
+
+                if score < MIN_RELEVANCE_THRESHOLD:
+                    continue
 
                 formatted_ev = self.evidence_service.format_evidence_items(
                     candidate_id=fac_id,
@@ -394,26 +412,35 @@ class MatchingService:
         if not required_capabilities or not people_candidates:
             return None
 
-        # Check if top 1 person covers all required query skills
+        # Check if top 1 person genuinely covers all required query capabilities
         top_cand = people_candidates[0]
         top_cand_caps = {s.lower() for s in top_cand.matched_skills + top_cand.matched_technologies}
         q_skills_lower = {s.lower() for s in query_skills}
+        q_tech_lower = {t.lower() for t in query_tech}
+        all_req_lower = q_skills_lower.union(q_tech_lower)
+
+        # Single candidate is sufficient ONLY if top_cand has high relevance AND covers all requested skills/tech
+        is_single_sufficient = (
+            bool(all_req_lower)
+            and all_req_lower.issubset(top_cand_caps)
+            and top_cand.relevance_score >= 0.60
+        )
         
-        if (q_skills_lower and q_skills_lower.issubset(top_cand_caps)) or len(required_capabilities) <= 1:
+        if is_single_sufficient or len(required_capabilities) <= 1:
             node = HelpChainNode(
                 step_number=1,
                 focus_area=", ".join(required_capabilities[:3]),
                 candidate_id=top_cand.candidate_id,
                 candidate_name=top_cand.title,
                 candidate_type=top_cand.candidate_type,
-                reason=f"Single candidate covers core capabilities ({', '.join(top_cand.matched_skills[:2])}).",
+                reason=f"Primary candidate covers core technical requirements ({', '.join(top_cand.matched_skills[:2]) or 'Domain Expertise'}).",
                 matched_skills=top_cand.matched_skills,
             )
             return HelpChain(
                 needed_capabilities=required_capabilities,
                 covered_capabilities=top_cand.matched_skills or required_capabilities,
                 nodes=[node],
-                explanation="One candidate covers all required technical areas.",
+                explanation="Primary candidate demonstrates comprehensive coverage for the problem requirements.",
                 is_single_candidate_sufficient=True,
             )
 
@@ -425,7 +452,7 @@ class MatchingService:
         # Attempt to pick up to 3 candidates with complementary skills
         step = 1
         for cand in people_candidates:
-            cand_skills_lower = set([s.lower() for s in cand.matched_skills])
+            cand_skills_lower = set([s.lower() for s in cand.matched_skills + cand.matched_technologies])
             newly_covered = uncovered.intersection(cand_skills_lower)
 
             if newly_covered or step == 1:

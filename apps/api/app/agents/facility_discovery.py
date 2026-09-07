@@ -39,6 +39,7 @@ class FacilityDiscoveryAgent:
                     "id": str(item.entity_id),
                     "name": item.title,
                     "snippet": item.snippet,
+                    "score": item.score,
                     "metadata": item.metadata,
                 })
                 evidence_list.append(Evidence(
@@ -57,6 +58,7 @@ class FacilityDiscoveryAgent:
                     "id": str(item.entity_id),
                     "name": item.title,
                     "snippet": item.snippet,
+                    "score": item.score,
                     "metadata": item.metadata,
                 })
                 evidence_list.append(Evidence(

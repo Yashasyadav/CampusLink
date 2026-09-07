@@ -44,7 +44,11 @@ class ScoringService:
             Tuple of (final_score, relevance_level, evidence_strength, breakdown_dict)
         """
         # 1. Semantic relevance (0.0 to 1.0)
-        s_semantic = max(0.0, min(1.0, float(semantic_relevance)))
+        raw_sem = float(semantic_relevance)
+        if 0.0 < raw_sem < 0.35:
+            s_semantic = max(0.0, min(1.0, raw_sem * 4.0))
+        else:
+            s_semantic = max(0.0, min(1.0, raw_sem))
 
         # 2. Skill overlap ratio
         q_skills_set = {s.lower().strip() for s in query_skills if s.strip()}
@@ -52,7 +56,7 @@ class ScoringService:
         if q_skills_set:
             s_skill = len(q_skills_set.intersection(c_skills_set)) / len(q_skills_set)
         else:
-            s_skill = 1.0 if c_skills_set else 0.5
+            s_skill = 0.5 if c_skills_set else 0.0
         s_skill = max(0.0, min(1.0, s_skill))
 
         # 3. Technology overlap ratio
@@ -61,7 +65,7 @@ class ScoringService:
         if q_tech_set:
             s_tech = len(q_tech_set.intersection(c_tech_set)) / len(q_tech_set)
         else:
-            s_tech = 1.0 if c_tech_set else 0.5
+            s_tech = 0.5 if c_tech_set else 0.0
         s_tech = max(0.0, min(1.0, s_tech))
 
         # 4. Project evidence

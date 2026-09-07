@@ -45,6 +45,7 @@ class ProjectKnowledgeDiscoveryAgent:
                         "id": str(item.entity_id),
                         "title": item.title,
                         "snippet": item.snippet,
+                        "score": item.score,
                         "metadata": item.metadata,
                     })
                     evidence_list.append(Evidence(
@@ -63,6 +64,7 @@ class ProjectKnowledgeDiscoveryAgent:
                     "id": str(item.entity_id),
                     "title": item.title,
                     "snippet": item.snippet,
+                    "score": item.score,
                     "metadata": item.metadata,
                 })
                 evidence_list.append(Evidence(
@@ -82,6 +84,7 @@ class ProjectKnowledgeDiscoveryAgent:
                         "id": str(item.entity_id),
                         "title": item.title,
                         "snippet": item.snippet,
+                        "score": item.score,
                         "metadata": item.metadata,
                     })
                     evidence_list.append(Evidence(

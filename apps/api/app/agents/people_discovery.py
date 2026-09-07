@@ -39,10 +39,19 @@ class PeopleDiscoveryAgent:
                 if not profile_info:
                     continue
 
-                # Match skills against query_understanding skills
+                profile_skills = [s.lower() for s in profile_info.get("skills", [])]
+                profile_text = f"{profile_info.get('bio') or ''} {' '.join(profile_info.get('skills', []))}".lower()
+
+                # Match query skills
                 matched_skills = [
                     s for s in query_understanding.skills
-                    if s.lower() in (profile_info.get("bio") or "").lower()
+                    if s.lower() in profile_skills or s.lower() in profile_text
+                ]
+
+                # Match query technologies
+                matched_tech = [
+                    t for t in query_understanding.technologies
+                    if t.lower() in profile_skills or t.lower() in profile_text
                 ]
 
                 evidence_item = Evidence(
@@ -58,7 +67,7 @@ class PeopleDiscoveryAgent:
                     user_id=profile_info["user_id"],
                     display_name=profile_info["full_name"],
                     department=profile_info.get("department"),
-                    matched_skills=matched_skills or query_understanding.skills[:2],
+                    matched_skills=matched_skills,
                     evidence=[evidence_item],
                 )
                 candidates.append(candidate)

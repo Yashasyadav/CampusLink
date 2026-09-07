@@ -76,7 +76,7 @@ class ExplanationService:
                     f"Provide a 1-2 sentence evidence-backed explanation summary."
                 )
                 res = self.llm_provider.generate_text(prompt)
-                if res and len(res.strip()) > 10:
+                if res and len(res.strip()) > 10 and not res.strip().startswith("Mock response"):
                     explanation_text = res.strip()
             except Exception as exc:
                 logger.warning(f"LLM explanation generation fallback: {exc}")
@@ -93,7 +93,10 @@ class ExplanationService:
         evidence_items: List[EvidenceItem],
     ) -> str:
         """Constructs a deterministic, evidence-grounded explanation string."""
-        relevance_prefix = f"{relevance_level} match"
+        if "match" in relevance_level.lower():
+            relevance_prefix = relevance_level
+        else:
+            relevance_prefix = f"{relevance_level} match"
         
         parts = []
         if matched_skills:
@@ -104,7 +107,10 @@ class ExplanationService:
         if evidence_items:
             best_ev = evidence_items[0]
             if candidate_type == "PERSON":
-                return f"{relevance_prefix} because they previously worked on '{best_ev.source_title}' and have {' and '.join(parts) if parts else 'relevant campus background'}."
+                if best_ev.source_type in ("PROJECT", "RESEARCH", "PROBLEM_SOLUTION") and best_ev.source_title not in ("Public Profile & Skills", title):
+                    return f"{relevance_prefix} because they contributed to '{best_ev.source_title}' and have {' and '.join(parts) if parts else 'relevant background'}."
+                else:
+                    return f"{relevance_prefix} based on {' and '.join(parts) if parts else 'relevant profile background'}."
             elif candidate_type in ("PROJECT", "RESEARCH"):
                 return f"{relevance_prefix} as a similar campus endeavor featuring {' and '.join(parts) if parts else 'matching technologies'}."
             elif candidate_type == "PROBLEM_SOLUTION":

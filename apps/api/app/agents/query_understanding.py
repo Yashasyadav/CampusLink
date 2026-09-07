@@ -30,6 +30,19 @@ class QueryUnderstandingAgent:
         try:
             result = self.provider.generate_structured(prompt, QueryUnderstandingResult)
             result.original_query = query.strip()
+
+            # Post-process: Filter ungrounded domains
+            q_lower = query.lower()
+            filtered_domains = []
+            for d in result.domain:
+                d_lower = d.lower()
+                if "security" in d_lower or "cyber" in d_lower or "crypto" in d_lower:
+                    if any(k in q_lower for k in ["security", "cyber", "attack", "vulnerability", "encryption", "auth", "hack", "threat"]):
+                        filtered_domains.append(d)
+                else:
+                    filtered_domains.append(d)
+
+            result.domain = filtered_domains
             return result
         except Exception as exc:
             logger.error(f"Query understanding parsing failed: {exc}")

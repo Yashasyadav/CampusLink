@@ -43,8 +43,11 @@ class EvidenceService:
 
         # Fallback if no raw evidence items were attached
         if not formatted and candidate_meta:
-            title = candidate_meta.get("title") or candidate_meta.get("display_name") or "Campus Record"
             source_type = candidate_type.upper()
+            if source_type == "PERSON":
+                title = "Public Profile & Skills"
+            else:
+                title = candidate_meta.get("title") or candidate_meta.get("name") or "Campus Record"
             snippet_text = candidate_meta.get("bio") or candidate_meta.get("description") or f"Explicit {source_type.lower()} match."
             formatted.append(
                 EvidenceItem(
