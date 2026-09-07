@@ -21,9 +21,11 @@ target_metadata = Base.metadata
 def get_url():
     url = settings.DATABASE_URL or "postgresql+psycopg://campuslink:campuslink_dev_pass@localhost:5433/campuslink_db"
     if url.startswith("postgresql+asyncpg://"):
-        url = url.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
-    elif url.startswith("postgresql://"):
-        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+        return url.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+psycopg://", 1)
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+psycopg://", 1)
     return url
 
 

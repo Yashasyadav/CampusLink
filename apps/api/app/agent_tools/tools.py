@@ -36,17 +36,128 @@ def search_people_tool(
     )
 
 
+def search_people_by_skills_tool(
+    db: Any,
+    current_user: User,
+    skills: List[str],
+    technologies: List[str],
+    limit: int = 10,
+) -> List[Dict[str, Any]]:
+    """
+    Tool: DB-first structured candidate discovery via UserSkill and ProjectContributor relationships.
+
+    Returns candidate dicts with user_id, display_name, department, matched_skills, searchable.
+    Enforces profile.searchable=True and excludes current_user.
+    Does NOT perform unrestricted SQL — uses controlled ORM queries only.
+    """
+    from sqlalchemy import select
+    from app.models.skills import UserSkill, Skill
+    from app.models.projects import ProjectContributor
+
+    if not skills and not technologies:
+        return []
+
+    all_terms = [t.lower().strip() for t in (skills + technologies) if t.strip()]
+
+    # 1. Find users who have matching UserSkill entries
+    skill_rows = db.query(UserSkill).all()
+    matched_user_ids: set = set()
+    matched_reasons: dict = {}
+
+    for us in skill_rows:
+        if hasattr(us, "skill") and us.skill and hasattr(us.skill, "name"):
+            skill_name_lower = us.skill.name.lower()
+            if any(term in skill_name_lower or skill_name_lower in term for term in all_terms):
+                if str(us.user_id) != str(current_user.id):
+                    matched_user_ids.add(str(us.user_id))
+                    matched_reasons.setdefault(str(us.user_id), []).append(us.skill.name)
+
+    # 2. Find users who contribute to projects that match the terms (by project title/description)
+    from app.models.projects import ProjectContributor
+    contrib_rows = db.query(ProjectContributor).all()
+    for c in contrib_rows:
+        if str(c.user_id) == str(current_user.id):
+            continue
+        proj = db.get(Project, c.project_id)
+        if not proj:
+            continue
+        vis = proj.visibility.value if hasattr(proj.visibility, "value") else str(proj.visibility)
+        if vis == "PRIVATE" and str(proj.created_by) != str(current_user.id):
+            continue
+        combined_text = f"{proj.title} {proj.description or ''}".lower()
+        if any(term in combined_text for term in all_terms):
+            uid = str(c.user_id)
+            if uid != str(current_user.id):
+                matched_user_ids.add(uid)
+                matched_reasons.setdefault(uid, []).append(f"Project: {proj.title}")
+
+    # 3. Find users who authored relevant problem solutions
+    from app.models.knowledge import ProblemSolution as PS
+    sol_rows = db.query(PS).all()
+    for ps in sol_rows:
+        if str(ps.author_id) == str(current_user.id):
+            continue
+        vis = ps.visibility.value if hasattr(ps.visibility, "value") else str(ps.visibility)
+        if vis == "PRIVATE" and str(ps.author_id) != str(current_user.id):
+            continue
+        combined_text = f"{ps.title} {ps.problem or ''} {ps.solution or ''}".lower()
+        if any(term in combined_text for term in all_terms):
+            uid = str(ps.author_id)
+            if uid != str(current_user.id):
+                matched_user_ids.add(uid)
+                matched_reasons.setdefault(uid, []).append(f"Solution: {ps.title}")
+
+    # 4. Build candidate dicts, enforce profile.searchable=True
+    candidates = []
+    for uid_str in list(matched_user_ids)[:limit]:
+        try:
+            uid = uuid.UUID(uid_str)
+        except Exception:
+            continue
+        from sqlalchemy import select as sa_select2
+        profile = db.scalar(sa_select2(Profile).where(Profile.user_id == uid))
+        if not profile or not profile.searchable:
+            continue
+
+
+        user_skills = []
+        try:
+            us_rows = db.query(UserSkill).filter(UserSkill.user_id == uid).all()
+            for us in us_rows:
+                if hasattr(us, "skill") and us.skill:
+                    user_skills.append(us.skill.name)
+        except Exception:
+            pass
+
+        candidates.append({
+            "user_id": str(uid),
+            "display_name": profile.full_name,
+            "department": profile.department,
+            "skills": user_skills,
+            "matched_evidence": matched_reasons.get(uid_str, []),
+            "searchable": profile.searchable,
+            "discovery_method": "DB_SKILL_MATCH",
+        })
+
+    logger.info(f"search_people_by_skills_tool: found {len(candidates)} candidates for terms={all_terms[:3]}")
+    return candidates
+
+
 def get_profile_tool(db: Any, current_user: User, user_id: uuid.UUID) -> Optional[Dict[str, Any]]:
-    """Tool: Fetch public profile details for a given user ID."""
-    profile = db.get(Profile, user_id)
+    """Tool: Fetch public profile details for a given user ID (by user_id, not profile.id)."""
+    from sqlalchemy import select as sa_select
+    profile = db.scalar(sa_select(Profile).where(Profile.user_id == user_id))
     if not profile or not profile.searchable:
         return None
 
-    # Fetch user skills from relation
+    # Fetch user skills directly from UserSkill table
+    from app.models.skills import UserSkill
     user_skills = []
-    user_obj = db.get(User, user_id)
-    if user_obj and hasattr(user_obj, "user_skills") and user_obj.user_skills:
-        user_skills = [us.skill.name for us in user_obj.user_skills if us.skill]
+    try:
+        us_rows = db.query(UserSkill).filter(UserSkill.user_id == user_id).all()
+        user_skills = [us.skill.name for us in us_rows if us.skill]
+    except Exception as exc:
+        logger.warning(f"get_profile_tool: failed to load skills for {user_id}: {exc}")
 
     return {
         "user_id": profile.user_id,
@@ -85,7 +196,7 @@ def get_person_evidence_graph_tool(db: Any, current_user: User, target_user_id: 
             if vis != "PRIVATE" or proj.created_by == current_user.id or target_user_id == current_user.id:
                 seen_proj.add(proj.id)
                 role_str = c.role.value if hasattr(c.role, "value") else str(c.role)
-                techs = [t.technology_name for t in getattr(proj, "technologies", [])] if hasattr(proj, "technologies") else []
+                techs = [getattr(t, "name", getattr(t, "technology_name", str(t))) for t in getattr(proj, "technologies", [])] if hasattr(proj, "technologies") else []
                 projects.append({
                     "project_id": str(proj.id),
                     "title": proj.title,
@@ -100,7 +211,7 @@ def get_person_evidence_graph_tool(db: Any, current_user: User, target_user_id: 
             vis = proj.visibility.value if hasattr(proj.visibility, "value") else str(proj.visibility)
             if vis != "PRIVATE" or proj.created_by == current_user.id:
                 seen_proj.add(proj.id)
-                techs = [t.technology_name for t in getattr(proj, "technologies", [])] if hasattr(proj, "technologies") else []
+                techs = [getattr(t, "name", getattr(t, "technology_name", str(t))) for t in getattr(proj, "technologies", [])] if hasattr(proj, "technologies") else []
                 projects.append({
                     "project_id": str(proj.id),
                     "title": proj.title,
@@ -115,7 +226,7 @@ def get_person_evidence_graph_tool(db: Any, current_user: User, target_user_id: 
     for ps in sol_rows:
         vis = ps.visibility.value if hasattr(ps.visibility, "value") else str(ps.visibility)
         if vis != "PRIVATE" or ps.author_id == current_user.id:
-            techs = [t.technology_name for t in getattr(ps, "technologies", [])] if hasattr(ps, "technologies") else []
+            techs = [getattr(t, "name", getattr(t, "technology_name", str(t))) for t in getattr(ps, "technologies", [])] if hasattr(ps, "technologies") else []
             solutions.append({
                 "solution_id": str(ps.id),
                 "title": ps.title,

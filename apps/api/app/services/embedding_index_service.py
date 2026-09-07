@@ -157,15 +157,18 @@ class EmbeddingIndexService:
 
         for etype in allowed_types:
             records = self._get_all_entities_of_type(db, etype)
-            logger.info(f"DEBUG REINDEX {etype}: found {len(records)} records")
+            logger.info(f"Reindexing {etype}: found {len(records)} records")
             report.total_records += len(records)
 
             for item in records:
-                e_id = getattr(item, "id", None)
+                # Profile uses user_id as its primary key, not id
                 if etype == "PROFILE":
-                    e_id = getattr(item, "id", None)  # profile.id
+                    e_id = getattr(item, "user_id", None)
+                else:
+                    e_id = getattr(item, "id", None)
 
                 if not e_id:
+                    logger.warning(f"Cannot determine entity_id for {etype}: {item}")
                     report.failed_records += 1
                     continue
 
@@ -186,6 +189,7 @@ class EmbeddingIndexService:
 
     def _load_entity(self, db: Session, entity_type: str, entity_id: uuid.UUID) -> Optional[Any]:
         if entity_type == "PROFILE":
+            # Profile PK is user_id, not id
             return db.get(Profile, entity_id)
         elif entity_type == "PROJECT":
             return db.get(Project, entity_id)

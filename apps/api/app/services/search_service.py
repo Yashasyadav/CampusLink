@@ -238,7 +238,10 @@ class SearchService:
         user_id = user.id if user else None
 
         if entity_type == "PROFILE":
-            profile = db.get(Profile, entity_id)
+            # PROFILE embeddings are indexed by user_id, not profile.id
+            # Must query by user_id, not by profile.id (the Base PK)
+            from sqlalchemy import select as sa_select
+            profile = db.scalar(sa_select(Profile).where(Profile.user_id == entity_id))
             if not profile or not profile.searchable:
                 return None  # Exclude non-searchable profiles
 
@@ -248,10 +251,12 @@ class SearchService:
                 title=profile.full_name,
                 snippet=profile.bio[:200] if profile.bio else f"{profile.department or 'Campus Member'}",
                 score=score,
+                matched_fields=["profile"],
                 metadata={
                     "department": profile.department,
                     "designation": profile.designation,
                     "location": profile.location,
+                    "user_id": str(entity_id),
                 },
             )
 
