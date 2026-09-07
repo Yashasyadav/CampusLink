@@ -79,6 +79,8 @@ class AgentTrace(BaseModel):
     result_count: int = Field(default=0, description="Total candidates/items discovered")
     status: str = Field(default="SUCCESS", description="Execution status")
     duration_ms: float = Field(default=0.0, description="Execution duration in milliseconds")
+    provider: Optional[str] = Field(default=None, description="Active LLM provider class name")
+    model: Optional[str] = Field(default=None, description="Active LLM model identifier")
 
 
 class DiscoveryRequest(BaseModel):

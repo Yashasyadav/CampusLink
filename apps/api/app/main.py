@@ -7,6 +7,7 @@ from app.api.routes import api_router
 from app.schemas.health import HealthCheckResponse
 from app.db.session import AsyncSessionLocal
 
+# Trigger uvicorn reload after fix
 setup_logging()
 
 app = FastAPI(

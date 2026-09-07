@@ -68,6 +68,9 @@ def node_understand_query(state: DiscoveryGraphState, config: RunnableConfig = N
         t_dur = round((time.time() - t0) * 1000, 2)
         end_iso = datetime.now(timezone.utc).isoformat()
 
+        provider_name = agent.provider.__class__.__name__ if hasattr(agent, "provider") and agent.provider else None
+        model_name = agent.provider.model_name if hasattr(agent, "provider") and agent.provider else None
+
         trace_entry = {
             "agent_name": "QueryUnderstandingAgent",
             "started_at": start_iso,
@@ -76,6 +79,8 @@ def node_understand_query(state: DiscoveryGraphState, config: RunnableConfig = N
             "result_count": len(qu_res.skills) + len(qu_res.technologies),
             "status": "SUCCESS",
             "duration_ms": t_dur,
+            "provider": provider_name,
+            "model": model_name,
         }
 
         return {
@@ -434,6 +439,9 @@ def node_generate_explanations(state: DiscoveryGraphState, config: RunnableConfi
     t_dur = round((time.time() - t0) * 1000, 2)
     end_iso = datetime.now(timezone.utc).isoformat()
 
+    provider_name = exp_service.llm_provider.__class__.__name__ if hasattr(exp_service, "llm_provider") and exp_service.llm_provider else None
+    model_name = exp_service.llm_provider.model_name if hasattr(exp_service, "llm_provider") and exp_service.llm_provider else None
+
     trace_entry = {
         "agent_name": "ExplanationEngineNode",
         "started_at": start_iso,
@@ -442,6 +450,8 @@ def node_generate_explanations(state: DiscoveryGraphState, config: RunnableConfi
         "result_count": len(updated_people),
         "status": "SUCCESS",
         "duration_ms": t_dur,
+        "provider": provider_name,
+        "model": model_name,
     }
 
     return {

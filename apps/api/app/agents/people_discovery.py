@@ -84,78 +84,84 @@ class PeopleDiscoveryAgent:
             candidates: List[PeopleCandidate] = []
 
             for source, semantic_item, db_item in combined_items[:limit]:
-                if source == "SEMANTIC":
-                    entity_id = semantic_item.entity_id
-                    raw_score = semantic_item.score
-                    snippet = semantic_item.snippet
-                else:
-                    # DB-first candidate
-                    try:
-                        entity_id = uuid.UUID(str(db_item["user_id"]))
-                    except Exception:
+                try:
+                    if source == "SEMANTIC":
+                        entity_id = semantic_item.entity_id
+                        raw_score = semantic_item.score
+                        snippet = semantic_item.snippet
+                    else:
+                        # DB-first candidate
+                        try:
+                            entity_id = uuid.UUID(str(db_item["user_id"]))
+                        except Exception:
+                            continue
+                        raw_score = 0.40  # structural match baseline score
+                        snippet = f"Matched via skills/projects: {', '.join(db_item.get('matched_evidence', [])[:2])}"
+
+                    # Strict self-exclusion
+                    if str(entity_id) == str(current_user.id):
                         continue
-                    raw_score = 0.40  # structural match baseline score
-                    snippet = f"Matched via skills/projects: {', '.join(db_item.get('matched_evidence', [])[:2])}"
 
-                # Strict self-exclusion
-                if str(entity_id) == str(current_user.id):
+                    # Get profile details
+                    profile_info = get_profile_tool(db, current_user, entity_id)
+                    if not profile_info:
+                        continue
+                    if str(profile_info.get("user_id")) == str(current_user.id):
+                        continue
+
+                    # Get structured DB evidence graph
+                    ev_graph = get_person_evidence_graph_tool(db, current_user, entity_id)
+
+                    # Combine skills and text for matching
+                    graph_skills = [s.lower() for s in ev_graph.get("skills", [])]
+                    graph_techs = []
+                    for p in ev_graph.get("projects", []):
+                        graph_techs.extend([t.lower() for t in p.get("technologies", [])])
+                    for s in ev_graph.get("solutions", []):
+                        graph_techs.extend([t.lower() for t in s.get("technologies", [])])
+
+                    profile_skills = [s.lower() for s in profile_info.get("skills", [])] + graph_skills
+                    profile_text = f"{profile_info.get('bio') or ''} {' '.join(profile_skills)} {' '.join(graph_techs)}".lower()
+
+                    # Match query skills
+                    matched_skills = [
+                        s for s in q_skills
+                        if s.lower() in profile_skills or s.lower() in profile_text
+                    ]
+                    if not matched_skills and profile_skills:
+                        matched_skills = [profile_info.get("skills", [])[0]] if profile_info.get("skills") else []
+
+                    # Match query technologies
+                    matched_tech = [
+                        t for t in q_tech
+                        if t.lower() in profile_skills or t.lower() in graph_techs or t.lower() in profile_text
+                    ]
+
+                    evidence_item = Evidence(
+                        entity_type="PROFILE",
+                        entity_id=entity_id,
+                        title=profile_info["full_name"],
+                        source=f"search_people_tool:{source}",
+                        snippet=snippet,
+                        score=raw_score,
+                    )
+
+                    candidate = PeopleCandidate(
+                        user_id=profile_info["user_id"],
+                        display_name=profile_info["full_name"],
+                        department=profile_info.get("department"),
+                        matched_skills=list(dict.fromkeys(matched_skills)),
+                        matched_technologies=list(dict.fromkeys(matched_tech)),
+                        evidence=[evidence_item],
+                        person_evidence_graph=ev_graph,
+                        evidence_count=ev_graph.get("evidence_count", 0),
+                    )
+                    candidates.append(candidate)
+                except Exception as cand_exc:
+                    logger.warning(
+                        f"PeopleDiscoveryAgent: candidate error for entity_id={entity_id if 'entity_id' in locals() else 'unknown'}: {cand_exc}"
+                    )
                     continue
-
-                # Get profile details
-                profile_info = get_profile_tool(db, current_user, entity_id)
-                if not profile_info:
-                    continue
-                if str(profile_info.get("user_id")) == str(current_user.id):
-                    continue
-
-                # Get structured DB evidence graph
-                ev_graph = get_person_evidence_graph_tool(db, current_user, entity_id)
-
-                # Combine skills and text for matching
-                graph_skills = [s.lower() for s in ev_graph.get("skills", [])]
-                graph_techs = []
-                for p in ev_graph.get("projects", []):
-                    graph_techs.extend([t.lower() for t in p.get("technologies", [])])
-                for s in ev_graph.get("solutions", []):
-                    graph_techs.extend([t.lower() for t in s.get("technologies", [])])
-
-                profile_skills = [s.lower() for s in profile_info.get("skills", [])] + graph_skills
-                profile_text = f"{profile_info.get('bio') or ''} {' '.join(profile_skills)} {' '.join(graph_techs)}".lower()
-
-                # Match query skills
-                matched_skills = [
-                    s for s in q_skills
-                    if s.lower() in profile_skills or s.lower() in profile_text
-                ]
-                if not matched_skills and profile_skills:
-                    matched_skills = [profile_info.get("skills", [])[0]] if profile_info.get("skills") else []
-
-                # Match query technologies
-                matched_tech = [
-                    t for t in q_tech
-                    if t.lower() in profile_skills or t.lower() in graph_techs or t.lower() in profile_text
-                ]
-
-                evidence_item = Evidence(
-                    entity_type="PROFILE",
-                    entity_id=entity_id,
-                    title=profile_info["full_name"],
-                    source=f"search_people_tool:{source}",
-                    snippet=snippet,
-                    score=raw_score,
-                )
-
-                candidate = PeopleCandidate(
-                    user_id=profile_info["user_id"],
-                    display_name=profile_info["full_name"],
-                    department=profile_info.get("department"),
-                    matched_skills=list(dict.fromkeys(matched_skills)),
-                    matched_technologies=list(dict.fromkeys(matched_tech)),
-                    evidence=[evidence_item],
-                    person_evidence_graph=ev_graph,
-                    evidence_count=ev_graph.get("evidence_count", 0),
-                )
-                candidates.append(candidate)
 
             summary = f"Discovered {len(candidates)} evidence-backed people candidates (semantic={sum(1 for s,_,_ in combined_items if s=='SEMANTIC')}, db={sum(1 for s,_,_ in combined_items if s=='DB')})."
             logger.info(f"PeopleDiscoveryAgent: {summary}")

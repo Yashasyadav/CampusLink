@@ -170,6 +170,49 @@ def get_profile_tool(db: Any, current_user: User, user_id: uuid.UUID) -> Optiona
     }
 
 
+def _normalize_technologies(entity: Any) -> List[str]:
+    """
+    Safely extract and normalize technology strings from an entity (Project, ProblemSolution, etc.).
+    Never throws TypeError when technologies is None, an empty list, strings, or ORM objects.
+    """
+    if entity is None:
+        return []
+
+    raw = None
+    # 1. Prefer relationship objects if available
+    if hasattr(entity, "ps_technologies") and getattr(entity, "ps_technologies", None) is not None:
+        raw = getattr(entity, "ps_technologies")
+    elif hasattr(entity, "project_technologies") and getattr(entity, "project_technologies", None) is not None:
+        raw = getattr(entity, "project_technologies")
+    elif hasattr(entity, "technologies"):
+        raw = getattr(entity, "technologies")
+
+    if not raw:
+        return []
+
+    result = []
+    if isinstance(raw, (list, tuple, set)):
+        for item in raw:
+            if item is None:
+                continue
+            if isinstance(item, str):
+                name = item.strip()
+            elif hasattr(item, "name") and getattr(item, "name", None):
+                name = str(getattr(item, "name")).strip()
+            elif hasattr(item, "technology_name") and getattr(item, "technology_name", None):
+                name = str(getattr(item, "technology_name")).strip()
+            else:
+                name = str(item).strip()
+            if name and name not in result:
+                result.append(name)
+    elif isinstance(raw, str):
+        name = raw.strip()
+        if name:
+            result.append(name)
+
+    return result
+
+
 def get_person_evidence_graph_tool(db: Any, current_user: User, target_user_id: uuid.UUID) -> Dict[str, Any]:
     """Tool: Fetch DB-backed contribution and evidence graph for a candidate user."""
     from app.models.skills import UserSkill
@@ -196,7 +239,7 @@ def get_person_evidence_graph_tool(db: Any, current_user: User, target_user_id: 
             if vis != "PRIVATE" or proj.created_by == current_user.id or target_user_id == current_user.id:
                 seen_proj.add(proj.id)
                 role_str = c.role.value if hasattr(c.role, "value") else str(c.role)
-                techs = [getattr(t, "name", getattr(t, "technology_name", str(t))) for t in getattr(proj, "technologies", [])] if hasattr(proj, "technologies") else []
+                techs = _normalize_technologies(proj)
                 projects.append({
                     "project_id": str(proj.id),
                     "title": proj.title,
@@ -211,7 +254,7 @@ def get_person_evidence_graph_tool(db: Any, current_user: User, target_user_id: 
             vis = proj.visibility.value if hasattr(proj.visibility, "value") else str(proj.visibility)
             if vis != "PRIVATE" or proj.created_by == current_user.id:
                 seen_proj.add(proj.id)
-                techs = [getattr(t, "name", getattr(t, "technology_name", str(t))) for t in getattr(proj, "technologies", [])] if hasattr(proj, "technologies") else []
+                techs = _normalize_technologies(proj)
                 projects.append({
                     "project_id": str(proj.id),
                     "title": proj.title,
@@ -226,7 +269,7 @@ def get_person_evidence_graph_tool(db: Any, current_user: User, target_user_id: 
     for ps in sol_rows:
         vis = ps.visibility.value if hasattr(ps.visibility, "value") else str(ps.visibility)
         if vis != "PRIVATE" or ps.author_id == current_user.id:
-            techs = [getattr(t, "name", getattr(t, "technology_name", str(t))) for t in getattr(ps, "technologies", [])] if hasattr(ps, "technologies") else []
+            techs = _normalize_technologies(ps)
             solutions.append({
                 "solution_id": str(ps.id),
                 "title": ps.title,
