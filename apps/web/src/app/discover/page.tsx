@@ -15,6 +15,7 @@ import {
 import { matchingApi } from "@/lib/api/matching";
 import { feedbackApi, FeedbackType } from "@/lib/api/feedback";
 import { MatchingAnalyzeResponse, MatchingResult, HelpChain } from "@/types/matching";
+import { getEvidenceDetails } from "@/lib/evidence";
 
 const EXAMPLE_QUERIES = [
   "My ESP32 microphone works, but my TinyML keyword detection model has poor accuracy. I don't know whether the problem is the microphone, preprocessing, or ML model.",
@@ -408,6 +409,7 @@ function CandidateCard({ item, href, actionLabel, isSolution = false }: { item: 
 
   const scorePercent = Math.round(item.relevance_score * 100);
   const recId = item.recommendation_id || item.recommendation_event_id;
+  const evidenceDetails = getEvidenceDetails(item);
 
   const handleFeedbackSubmit = async (type: FeedbackType, textComment?: string) => {
     if (!recId) return;
@@ -447,10 +449,13 @@ function CandidateCard({ item, href, actionLabel, isSolution = false }: { item: 
                   {item.help_type.replace(/_/g, " ")}
                 </span>
               )}
-              {item.supporting_evidence.length > 0 && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-md">
+              {evidenceDetails.totalCount > 0 && (
+                <span
+                  className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-md"
+                  title={evidenceDetails.label}
+                >
                   <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                  Grounded ({item.supporting_evidence.length})
+                  {evidenceDetails.label}
                 </span>
               )}
             </div>
@@ -476,7 +481,7 @@ function CandidateCard({ item, href, actionLabel, isSolution = false }: { item: 
         </p>
 
         {/* Matched badges */}
-        <div className="flex flex-wrap gap-1.5 mb-4">
+        <div className="flex flex-wrap gap-1.5 mb-3.5">
           {item.matched_skills.slice(0, 4).map((sk, i) => (
             <span key={i} className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">{sk}</span>
           ))}
@@ -484,6 +489,24 @@ function CandidateCard({ item, href, actionLabel, isSolution = false }: { item: 
             <span key={i} className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-orange-50 text-orange-700 border border-orange-200">{tc}</span>
           ))}
         </div>
+
+        {/* Evidence Sources Breakdown */}
+        {evidenceDetails.categories.length > 0 && (
+          <div className="mb-3.5 p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1.5">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-800">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+              <span>{evidenceDetails.label}</span>
+            </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-600">
+              {evidenceDetails.categories.map((cat) => (
+                <span key={cat.key} className="inline-flex items-center gap-1 font-medium">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                  {cat.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Expandable Why This Match drawer */}
         <div className="border-t border-slate-100 pt-3">
@@ -512,36 +535,42 @@ function CandidateCard({ item, href, actionLabel, isSolution = false }: { item: 
                 </div>
               )}
 
-              {item.person_evidence_graph && (
+              {item.person_evidence_graph && evidenceDetails.totalCount > 0 && (
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Verified Evidence Graph</p>
                     <span className="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md">
-                      {item.person_evidence_graph.evidence_count || item.evidence_count || 0} Sources
+                      {evidenceDetails.shortBadgeLabel}
                     </span>
                   </div>
-                  {item.person_evidence_graph.projects?.length > 0 && (
+                  {item.person_evidence_graph.skills && item.person_evidence_graph.skills.length > 0 && (
+                    <div className="text-[11px] text-slate-700">
+                      <span className="font-semibold text-slate-900">Verified Skills: </span>
+                      {item.person_evidence_graph.skills.join(", ")}
+                    </div>
+                  )}
+                  {item.person_evidence_graph.projects && item.person_evidence_graph.projects.length > 0 && (
                     <div className="text-[11px] text-slate-700">
                       <span className="font-semibold text-slate-900">Projects: </span>
-                      {item.person_evidence_graph.projects.map((p: any) => p.title).join(", ")}
+                      {item.person_evidence_graph.projects.map((p) => p.title).join(", ")}
                     </div>
                   )}
-                  {item.person_evidence_graph.solutions?.length > 0 && (
+                  {item.person_evidence_graph.solutions && item.person_evidence_graph.solutions.length > 0 && (
                     <div className="text-[11px] text-slate-700">
                       <span className="font-semibold text-slate-900">Past Solutions: </span>
-                      {item.person_evidence_graph.solutions.map((s: any) => s.title).join(", ")}
+                      {item.person_evidence_graph.solutions.map((s) => s.title).join(", ")}
                     </div>
                   )}
-                  {item.person_evidence_graph.research?.length > 0 && (
+                  {item.person_evidence_graph.research && item.person_evidence_graph.research.length > 0 && (
                     <div className="text-[11px] text-slate-700">
                       <span className="font-semibold text-slate-900">Research: </span>
-                      {item.person_evidence_graph.research.map((r: any) => r.title).join(", ")}
+                      {item.person_evidence_graph.research.map((r) => r.title).join(", ")}
                     </div>
                   )}
-                  {item.person_evidence_graph.facilities?.length > 0 && (
+                  {item.person_evidence_graph.facilities && item.person_evidence_graph.facilities.length > 0 && (
                     <div className="text-[11px] text-slate-700">
                       <span className="font-semibold text-slate-900">Labs: </span>
-                      {item.person_evidence_graph.facilities.map((f: any) => f.name).join(", ")}
+                      {item.person_evidence_graph.facilities.map((f) => f.name).join(", ")}
                     </div>
                   )}
                 </div>

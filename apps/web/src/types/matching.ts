@@ -6,6 +6,44 @@ export interface EvidenceItem {
   relevance: number;
 }
 
+export interface PersonEvidenceProject {
+  project_id: string;
+  title: string;
+  role?: string;
+  snippet?: string;
+  technologies?: string[];
+}
+
+export interface PersonEvidenceSolution {
+  solution_id: string;
+  title: string;
+  summary?: string;
+  technologies?: string[];
+}
+
+export interface PersonEvidenceResearch {
+  research_id: string;
+  title: string;
+  publication_type?: string;
+  abstract?: string;
+}
+
+export interface PersonEvidenceFacility {
+  facility_id: string;
+  name: string;
+  location?: string;
+}
+
+export interface PersonEvidenceGraph {
+  user_id?: string;
+  skills?: string[];
+  projects?: PersonEvidenceProject[];
+  solutions?: PersonEvidenceSolution[];
+  research?: PersonEvidenceResearch[];
+  facilities?: PersonEvidenceFacility[];
+  evidence_count?: number;
+}
+
 export interface MatchingResult {
   candidate_id: string;
   candidate_type: "PERSON" | "PROJECT" | "RESEARCH" | "PROBLEM_SOLUTION" | "FACILITY" | "EQUIPMENT";
@@ -19,7 +57,7 @@ export interface MatchingResult {
   supporting_evidence: EvidenceItem[];
   evidence_strength: "Strong evidence" | "Moderate evidence" | "Basic evidence" | string;
   evidence_count?: number;
-  person_evidence_graph?: Record<string, any>;
+  person_evidence_graph?: PersonEvidenceGraph | null;
   explanation: string;
   help_type?: string | null;
   strengths: string[];
