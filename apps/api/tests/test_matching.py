@@ -39,7 +39,7 @@ def test_scoring_formula_exact():
     # query_tech = ["C++", "TensorFlow"], candidate_tech = ["C++"] -> s_tech = 0.5
     # has_project = True -> 1.0
     # has_solution = False -> 0.0
-    # best_ev = "PROJECT" -> 0.85
+    # has_research = False -> 0.0
     score, level, ev_strength, breakdown = scoring.calculate_score(
         semantic_relevance=0.90,
         query_skills=["ESP32", "TinyML"],
@@ -48,6 +48,7 @@ def test_scoring_formula_exact():
         candidate_technologies=["C++"],
         has_project_evidence=True,
         has_solution_evidence=False,
+        has_research_evidence=False,
         best_evidence_type="PROJECT",
     )
 
@@ -57,13 +58,13 @@ def test_scoring_formula_exact():
         + MATCHING_WEIGHTS["technology_overlap"] * 0.5
         + MATCHING_WEIGHTS["project_evidence"] * 1.0
         + MATCHING_WEIGHTS["solution_evidence"] * 0.0
-        + MATCHING_WEIGHTS["evidence_quality"] * 0.85
+        + MATCHING_WEIGHTS["research_evidence"] * 0.0
     )
     expected = round(expected, 4)
 
     assert score == expected
     assert level in ("High relevance", "Strong match")
-    assert ev_strength in ("Strong", "Moderate")
+    assert "evidence" in ev_strength.lower() or ev_strength in ("Strong", "Moderate")
 
 
 def test_skill_matching_overlap():

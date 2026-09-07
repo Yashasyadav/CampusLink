@@ -60,12 +60,12 @@ class Settings(BaseSettings):
     # Matching & Explanation
     MATCHING_WEIGHTS: dict = Field(
         default={
-            "semantic_relevance": 0.35,
+            "semantic_relevance": 0.25,
             "skill_overlap": 0.20,
             "technology_overlap": 0.15,
             "project_evidence": 0.15,
-            "solution_evidence": 0.10,
-            "evidence_quality": 0.05,
+            "solution_evidence": 0.15,
+            "research_evidence": 0.10,
         }
     )
 

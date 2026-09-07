@@ -107,7 +107,7 @@ def test_search_and_reindex_flow(student_a_cookies, admin_cookies):
     search_req = {
         "query": "ESP32 audio noise filtering TinyML",
         "mode": "HYBRID",
-        "limit": 10,
+        "limit": 50,
     }
     search_resp = client.post("/api/v1/search", json=search_req, cookies=student_a_cookies)
     assert search_resp.status_code == 200

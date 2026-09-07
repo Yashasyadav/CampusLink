@@ -24,12 +24,12 @@ POST /api/v1/matching/analyze
    ┌─────────┴────────────────────────┐
    ▼                                  ▼
 Phase 7 Discovery           Scoring Engine (Deterministic)
-(People, Projects,          • Semantic relevance (35%)
+(People, Projects,          • Semantic relevance (25%)
  Solutions, Facilities)      • Skill overlap (20%)
                              • Tech overlap (15%)
                              • Project evidence (15%)
-                             • Solution evidence (10%)
-                             • Evidence quality (5%)
+                             • Solution evidence (15%)
+                             • Research evidence (10%)
                                       │
              ┌────────────────────────┴────────────────────────┐
              ▼                                                 ▼
@@ -61,12 +61,12 @@ $$\text{Final Score} = \sum_{i} w_i \cdot s_i$$
 
 | Weight Component | Percentage | Description |
 | :--- | :---: | :--- |
-| `semantic_relevance` | 35% | Vector & text retrieval similarity |
+| `semantic_relevance` | 25% | Vector & text retrieval similarity |
 | `skill_overlap` | 20% | Normalized Jaccard ratio of query skills to candidate skills |
 | `technology_overlap` | 15% | Normalized overlap ratio of required technologies |
 | `project_evidence` | 15% | Binary weight for direct candidate project evidence |
-| `solution_evidence` | 10% | Binary weight for direct historical solution evidence |
-| `evidence_quality` | 5% | Hierarchical evidence type strength score |
+| `solution_evidence` | 15% | Binary weight for direct historical solution evidence |
+| `research_evidence` | 10% | Binary weight for direct campus research publication evidence |
 
 ### Relevance Level Mapping
 - **$\ge 85\%$**: `High relevance`

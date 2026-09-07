@@ -5,7 +5,7 @@ from app.core.config import settings
 from app.core.logging import setup_logging
 from app.api.routes import api_router
 from app.schemas.health import HealthCheckResponse
-from app.db.session import AsyncSessionLocal
+from app.db.session import SyncSessionLocal
 
 # Trigger uvicorn reload after fix
 setup_logging()
@@ -35,16 +35,16 @@ app.add_middleware(
     tags=["System Health"],
     summary="Health check endpoint with database and pgvector verification",
 )
-async def health_check() -> HealthCheckResponse:
+def health_check() -> HealthCheckResponse:
     """Returns application status, database connectivity, and pgvector extension state."""
     db_status = "unhealthy"
     vector_status = "unavailable"
     pg_version = None
 
     try:
-        async with AsyncSessionLocal() as session:
+        with SyncSessionLocal() as session:
             # Test connectivity and fetch postgres version
-            result = await session.execute(text("SELECT version();"))
+            result = session.execute(text("SELECT version();"))
             version_str = result.scalar()
             if version_str:
                 db_status = "healthy"
@@ -52,7 +52,7 @@ async def health_check() -> HealthCheckResponse:
                 pg_version = version_str.split()[0] + " " + version_str.split()[1]
 
             # Test pgvector availability
-            vector_result = await session.execute(
+            vector_result = session.execute(
                 text("SELECT extname FROM pg_extension WHERE extname = 'vector';")
             )
             if vector_result.scalar():
