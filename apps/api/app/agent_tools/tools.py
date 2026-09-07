@@ -143,31 +143,68 @@ def search_people_by_skills_tool(
     return candidates
 
 
+def get_profiles_batch(
+    db: Any, current_user: User, user_ids: List[uuid.UUID]
+) -> Dict[str, Dict[str, Any]]:
+    """Batch-fetch public profile details for multiple user IDs with eager-loaded skills."""
+    if not user_ids:
+        return {}
+
+    from sqlalchemy import select as sa_select
+    from sqlalchemy.orm import joinedload
+    from app.models.skills import UserSkill
+
+    seen = set()
+    unique_ids = []
+    for uid in user_ids:
+        if uid and uid not in seen:
+            seen.add(uid)
+            unique_ids.append(uid)
+
+    if not unique_ids:
+        return {}
+
+    profiles = db.scalars(
+        sa_select(Profile).where(
+            Profile.user_id.in_(unique_ids),
+            Profile.searchable == True,
+        )
+    ).all()
+
+    # Eager load skills for all unique user IDs in one query
+    us_rows = (
+        db.query(UserSkill)
+        .options(joinedload(UserSkill.skill))
+        .filter(UserSkill.user_id.in_(unique_ids))
+        .all()
+    )
+    user_skills_map: Dict[str, List[str]] = {str(uid): [] for uid in unique_ids}
+    for us in us_rows:
+        if hasattr(us, "skill") and us.skill and hasattr(us.skill, "name"):
+            uid_key = str(us.user_id)
+            if uid_key in user_skills_map:
+                user_skills_map[uid_key].append(us.skill.name)
+
+    result: Dict[str, Dict[str, Any]] = {}
+    for profile in profiles:
+        uid_key = str(profile.user_id)
+        result[uid_key] = {
+            "user_id": profile.user_id,
+            "full_name": profile.full_name,
+            "department": profile.department,
+            "designation": profile.designation,
+            "bio": profile.bio,
+            "location": profile.location,
+            "skills": user_skills_map.get(uid_key, []),
+        }
+
+    return result
+
+
 def get_profile_tool(db: Any, current_user: User, user_id: uuid.UUID) -> Optional[Dict[str, Any]]:
     """Tool: Fetch public profile details for a given user ID (by user_id, not profile.id)."""
-    from sqlalchemy import select as sa_select
-    profile = db.scalar(sa_select(Profile).where(Profile.user_id == user_id))
-    if not profile or not profile.searchable:
-        return None
-
-    # Fetch user skills directly from UserSkill table
-    from app.models.skills import UserSkill
-    user_skills = []
-    try:
-        us_rows = db.query(UserSkill).filter(UserSkill.user_id == user_id).all()
-        user_skills = [us.skill.name for us in us_rows if us.skill]
-    except Exception as exc:
-        logger.warning(f"get_profile_tool: failed to load skills for {user_id}: {exc}")
-
-    return {
-        "user_id": profile.user_id,
-        "full_name": profile.full_name,
-        "department": profile.department,
-        "designation": profile.designation,
-        "bio": profile.bio,
-        "location": profile.location,
-        "skills": user_skills,
-    }
+    batch = get_profiles_batch(db, current_user, [user_id])
+    return batch.get(str(user_id))
 
 
 def _normalize_technologies(entity: Any) -> List[str]:
@@ -213,123 +250,256 @@ def _normalize_technologies(entity: Any) -> List[str]:
     return result
 
 
-def get_person_evidence_graph_tool(db: Any, current_user: User, target_user_id: uuid.UUID) -> Dict[str, Any]:
-    """Tool: Fetch DB-backed contribution and evidence graph for a candidate user."""
+def get_person_evidence_graphs_batch(
+    db: Any, current_user: User, target_user_ids: List[uuid.UUID]
+) -> Dict[str, Dict[str, Any]]:
+    """
+    Batch-fetch DB-backed contribution and evidence graph for multiple candidate users.
+    Performs constant-query batch retrieval to prevent N+1 queries.
+    Enforces identical visibility rules and returns identical graph structure as get_person_evidence_graph_tool.
+    """
+    if not target_user_ids:
+        return {}
+
+    from sqlalchemy import or_
+    from sqlalchemy.orm import joinedload, selectinload
     from app.models.skills import UserSkill
     from app.models.projects import ProjectContributor, Project
     from app.models.research import ResearchAuthor, ResearchItem
     from app.models.knowledge import ProblemSolution
     from app.models.facilities import Facility
 
-    # 1. User Skills
-    user_skills = []
-    us_rows = db.query(UserSkill).filter(UserSkill.user_id == target_user_id).all()
+    seen = set()
+    unique_ids = []
+    for uid in target_user_ids:
+        if uid and uid not in seen:
+            seen.add(uid)
+            unique_ids.append(uid)
+
+    if not unique_ids:
+        return {}
+
+    # Initialize container for each user
+    result: Dict[str, Dict[str, Any]] = {}
+    for uid in unique_ids:
+        result[str(uid)] = {
+            "user_id": str(uid),
+            "skills": [],
+            "projects": [],
+            "solutions": [],
+            "research": [],
+            "facilities": [],
+            "evidence_count": 0,
+        }
+
+    # 1. User Skills (batch query with joinedload for Skill)
+    us_rows = (
+        db.query(UserSkill)
+        .options(joinedload(UserSkill.skill))
+        .filter(UserSkill.user_id.in_(unique_ids))
+        .all()
+    )
     for us in us_rows:
         if hasattr(us, "skill") and us.skill and hasattr(us.skill, "name"):
-            user_skills.append(us.skill.name)
+            uid_key = str(us.user_id)
+            if uid_key in result:
+                result[uid_key]["skills"].append(us.skill.name)
 
     # 2. Contributed & Owned Projects
-    projects = []
-    seen_proj = set()
-    contrib_rows = db.query(ProjectContributor).filter(ProjectContributor.user_id == target_user_id).all()
+    contrib_rows = (
+        db.query(ProjectContributor)
+        .filter(ProjectContributor.user_id.in_(unique_ids))
+        .all()
+    )
+    contrib_map: Dict[str, List[Any]] = {str(uid): [] for uid in unique_ids}
+    contrib_proj_ids = set()
     for c in contrib_rows:
-        proj = db.get(Project, c.project_id)
-        if proj and proj.id not in seen_proj:
-            vis = proj.visibility.value if hasattr(proj.visibility, "value") else str(proj.visibility)
-            if vis != "PRIVATE" or proj.created_by == current_user.id or target_user_id == current_user.id:
-                seen_proj.add(proj.id)
-                role_str = c.role.value if hasattr(c.role, "value") else str(c.role)
-                techs = _normalize_technologies(proj)
-                projects.append({
-                    "project_id": str(proj.id),
-                    "title": proj.title,
-                    "role": role_str,
-                    "snippet": (c.contribution_description or proj.description or "")[:150],
-                    "technologies": techs,
-                })
+        contrib_map[str(c.user_id)].append(c)
+        contrib_proj_ids.add(c.project_id)
 
-    owned_projs = db.query(Project).filter(Project.created_by == target_user_id).all()
-    for proj in owned_projs:
-        if proj.id not in seen_proj:
-            vis = proj.visibility.value if hasattr(proj.visibility, "value") else str(proj.visibility)
-            if vis != "PRIVATE" or proj.created_by == current_user.id:
-                seen_proj.add(proj.id)
-                techs = _normalize_technologies(proj)
-                projects.append({
-                    "project_id": str(proj.id),
-                    "title": proj.title,
-                    "role": "Owner / Lead",
-                    "snippet": (proj.description or "")[:150],
-                    "technologies": techs,
-                })
+    proj_filters = [Project.created_by.in_(unique_ids)]
+    if contrib_proj_ids:
+        proj_filters.append(Project.id.in_(list(contrib_proj_ids)))
 
-    # 3. Authored Solutions
-    solutions = []
-    sol_rows = db.query(ProblemSolution).filter(ProblemSolution.author_id == target_user_id).all()
+    all_projs = (
+        db.query(Project)
+        .options(selectinload(Project.technologies))
+        .filter(or_(*proj_filters))
+        .all()
+    )
+    projs_by_id = {p.id: p for p in all_projs}
+    owned_projs_map: Dict[str, List[Any]] = {str(uid): [] for uid in unique_ids}
+    for p in all_projs:
+        if p.created_by and str(p.created_by) in owned_projs_map:
+            owned_projs_map[str(p.created_by)].append(p)
+
+    for uid in unique_ids:
+        uid_key = str(uid)
+        seen_proj = set()
+        user_projs = []
+
+        # Contributed
+        for c in contrib_map.get(uid_key, []):
+            proj = projs_by_id.get(c.project_id)
+            if proj and proj.id not in seen_proj:
+                vis = proj.visibility.value if hasattr(proj.visibility, "value") else str(proj.visibility)
+                if vis != "PRIVATE" or proj.created_by == current_user.id or uid == current_user.id:
+                    seen_proj.add(proj.id)
+                    role_str = c.role.value if hasattr(c.role, "value") else str(c.role)
+                    techs = _normalize_technologies(proj)
+                    user_projs.append({
+                        "project_id": str(proj.id),
+                        "title": proj.title,
+                        "role": role_str,
+                        "snippet": (c.contribution_description or proj.description or "")[:150],
+                        "technologies": techs,
+                    })
+
+        # Owned
+        for proj in owned_projs_map.get(uid_key, []):
+            if proj.id not in seen_proj:
+                vis = proj.visibility.value if hasattr(proj.visibility, "value") else str(proj.visibility)
+                if vis != "PRIVATE" or proj.created_by == current_user.id:
+                    seen_proj.add(proj.id)
+                    techs = _normalize_technologies(proj)
+                    user_projs.append({
+                        "project_id": str(proj.id),
+                        "title": proj.title,
+                        "role": "Owner / Lead",
+                        "snippet": (proj.description or "")[:150],
+                        "technologies": techs,
+                    })
+
+        result[uid_key]["projects"] = user_projs
+
+    # 3. Authored Solutions (batch query with selectinload for ps_technologies)
+    sol_rows = (
+        db.query(ProblemSolution)
+        .options(selectinload(ProblemSolution.ps_technologies))
+        .filter(ProblemSolution.author_id.in_(unique_ids))
+        .all()
+    )
     for ps in sol_rows:
-        vis = ps.visibility.value if hasattr(ps.visibility, "value") else str(ps.visibility)
-        if vis != "PRIVATE" or ps.author_id == current_user.id:
-            techs = _normalize_technologies(ps)
-            solutions.append({
-                "solution_id": str(ps.id),
-                "title": ps.title,
-                "summary": (ps.solution or ps.outcome or ps.problem or "")[:150],
-                "technologies": techs,
-            })
+        uid_key = str(ps.author_id)
+        if uid_key in result:
+            vis = ps.visibility.value if hasattr(ps.visibility, "value") else str(ps.visibility)
+            if vis != "PRIVATE" or ps.author_id == current_user.id:
+                techs = _normalize_technologies(ps)
+                result[uid_key]["solutions"].append({
+                    "solution_id": str(ps.id),
+                    "title": ps.title,
+                    "summary": (ps.solution or ps.outcome or ps.problem or "")[:150],
+                    "technologies": techs,
+                })
 
     # 4. Research Publications
-    research = []
-    seen_res = set()
-    ra_rows = db.query(ResearchAuthor).filter(ResearchAuthor.user_id == target_user_id).all()
+    ra_rows = (
+        db.query(ResearchAuthor)
+        .filter(ResearchAuthor.user_id.in_(unique_ids))
+        .all()
+    )
+    ra_map: Dict[str, List[Any]] = {str(uid): [] for uid in unique_ids}
+    ra_item_ids = set()
     for ra in ra_rows:
-        res_item = db.get(ResearchItem, ra.research_id)
-        if res_item and res_item.id not in seen_res:
-            vis = res_item.visibility.value if hasattr(res_item.visibility, "value") else str(res_item.visibility)
-            if vis != "PRIVATE" or res_item.owner_id == current_user.id or target_user_id == current_user.id:
-                seen_res.add(res_item.id)
-                pub_str = res_item.publication_type.value if hasattr(res_item.publication_type, "value") else str(res_item.publication_type)
-                research.append({
-                    "research_id": str(res_item.id),
-                    "title": res_item.title,
-                    "publication_type": pub_str,
-                    "abstract": (res_item.abstract or "")[:150],
-                })
+        ra_map[str(ra.user_id)].append(ra)
+        ra_item_ids.add(ra.research_id)
 
-    owned_res = db.query(ResearchItem).filter(ResearchItem.owner_id == target_user_id).all()
-    for res_item in owned_res:
-        if res_item.id not in seen_res:
-            vis = res_item.visibility.value if hasattr(res_item.visibility, "value") else str(res_item.visibility)
-            if vis != "PRIVATE" or res_item.owner_id == current_user.id:
-                seen_res.add(res_item.id)
-                pub_str = res_item.publication_type.value if hasattr(res_item.publication_type, "value") else str(res_item.publication_type)
-                research.append({
-                    "research_id": str(res_item.id),
-                    "title": res_item.title,
-                    "publication_type": pub_str,
-                    "abstract": (res_item.abstract or "")[:150],
-                })
+    res_filters = [ResearchItem.owner_id.in_(unique_ids)]
+    if ra_item_ids:
+        res_filters.append(ResearchItem.id.in_(list(ra_item_ids)))
+
+    all_res = (
+        db.query(ResearchItem)
+        .filter(or_(*res_filters))
+        .all()
+    )
+    res_by_id = {r.id: r for r in all_res}
+    owned_res_map: Dict[str, List[Any]] = {str(uid): [] for uid in unique_ids}
+    for r in all_res:
+        if r.owner_id and str(r.owner_id) in owned_res_map:
+            owned_res_map[str(r.owner_id)].append(r)
+
+    for uid in unique_ids:
+        uid_key = str(uid)
+        seen_res = set()
+        user_res = []
+
+        # Authored
+        for ra in ra_map.get(uid_key, []):
+            res_item = res_by_id.get(ra.research_id)
+            if res_item and res_item.id not in seen_res:
+                vis = res_item.visibility.value if hasattr(res_item.visibility, "value") else str(res_item.visibility)
+                if vis != "PRIVATE" or res_item.owner_id == current_user.id or uid == current_user.id:
+                    seen_res.add(res_item.id)
+                    pub_str = res_item.publication_type.value if hasattr(res_item.publication_type, "value") else str(res_item.publication_type)
+                    user_res.append({
+                        "research_id": str(res_item.id),
+                        "title": res_item.title,
+                        "publication_type": pub_str,
+                        "abstract": (res_item.abstract or "")[:150],
+                    })
+
+        # Owned
+        for res_item in owned_res_map.get(uid_key, []):
+            if res_item.id not in seen_res:
+                vis = res_item.visibility.value if hasattr(res_item.visibility, "value") else str(res_item.visibility)
+                if vis != "PRIVATE" or res_item.owner_id == current_user.id:
+                    seen_res.add(res_item.id)
+                    pub_str = res_item.publication_type.value if hasattr(res_item.publication_type, "value") else str(res_item.publication_type)
+                    user_res.append({
+                        "research_id": str(res_item.id),
+                        "title": res_item.title,
+                        "publication_type": pub_str,
+                        "abstract": (res_item.abstract or "")[:150],
+                    })
+
+        result[uid_key]["research"] = user_res
 
     # 5. Responsible Facilities
-    facilities = []
-    fac_rows = db.query(Facility).filter(Facility.responsible_user_id == target_user_id).all()
+    fac_rows = (
+        db.query(Facility)
+        .filter(Facility.responsible_user_id.in_(unique_ids))
+        .all()
+    )
     for fac in fac_rows:
-        facilities.append({
-            "facility_id": str(fac.id),
-            "name": fac.name,
-            "location": fac.location or fac.department or "",
-        })
+        uid_key = str(fac.responsible_user_id)
+        if uid_key in result:
+            result[uid_key]["facilities"].append({
+                "facility_id": str(fac.id),
+                "name": fac.name,
+                "location": fac.location or fac.department or "",
+            })
 
-    ev_count = len(user_skills) + len(projects) + len(solutions) + len(research) + len(facilities)
+    # Compute evidence_count
+    for uid in unique_ids:
+        uid_key = str(uid)
+        g = result[uid_key]
+        g["evidence_count"] = (
+            len(g["skills"])
+            + len(g["projects"])
+            + len(g["solutions"])
+            + len(g["research"])
+            + len(g["facilities"])
+        )
 
-    return {
-        "user_id": str(target_user_id),
-        "skills": user_skills,
-        "projects": projects,
-        "solutions": solutions,
-        "research": research,
-        "facilities": facilities,
-        "evidence_count": ev_count,
-    }
+    return result
+
+
+def get_person_evidence_graph_tool(db: Any, current_user: User, target_user_id: uuid.UUID) -> Dict[str, Any]:
+    """Tool: Fetch DB-backed contribution and evidence graph for a candidate user."""
+    graphs = get_person_evidence_graphs_batch(db, current_user, [target_user_id])
+    return graphs.get(
+        str(target_user_id),
+        {
+            "user_id": str(target_user_id),
+            "skills": [],
+            "projects": [],
+            "solutions": [],
+            "research": [],
+            "facilities": [],
+            "evidence_count": 0,
+        },
+    )
 
 
 def search_projects_tool(

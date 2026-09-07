@@ -4,7 +4,9 @@ from app.models.users import User
 from app.agent_tools.tools import (
     search_people_tool,
     get_profile_tool,
+    get_profiles_batch,
     get_person_evidence_graph_tool,
+    get_person_evidence_graphs_batch,
     search_people_by_skills_tool,
 )
 from app.schemas.agents import (
@@ -83,6 +85,23 @@ class PeopleDiscoveryAgent:
             # 4. Process each candidate into PeopleCandidate
             candidates: List[PeopleCandidate] = []
 
+            # Pre-collect valid target candidate UUIDs for batch retrieval
+            target_cand_ids: List[uuid.UUID] = []
+            for source, semantic_item, db_item in combined_items[:limit]:
+                try:
+                    if source == "SEMANTIC":
+                        cid = semantic_item.entity_id
+                    else:
+                        cid = uuid.UUID(str(db_item["user_id"]))
+                    if cid and str(cid) != str(current_user.id):
+                        target_cand_ids.append(cid)
+                except Exception:
+                    continue
+
+            # Batch retrieve profiles and evidence graphs (eliminates N+1 DB queries)
+            profiles_batch = get_profiles_batch(db, current_user, target_cand_ids)
+            evidence_graphs_batch = get_person_evidence_graphs_batch(db, current_user, target_cand_ids)
+
             for source, semantic_item, db_item in combined_items[:limit]:
                 try:
                     if source == "SEMANTIC":
@@ -102,15 +121,15 @@ class PeopleDiscoveryAgent:
                     if str(entity_id) == str(current_user.id):
                         continue
 
-                    # Get profile details
-                    profile_info = get_profile_tool(db, current_user, entity_id)
+                    # Get profile details (from batch map with fallback)
+                    profile_info = profiles_batch.get(str(entity_id)) or get_profile_tool(db, current_user, entity_id)
                     if not profile_info:
                         continue
                     if str(profile_info.get("user_id")) == str(current_user.id):
                         continue
 
-                    # Get structured DB evidence graph
-                    ev_graph = get_person_evidence_graph_tool(db, current_user, entity_id)
+                    # Get structured DB evidence graph (from batch map with fallback)
+                    ev_graph = evidence_graphs_batch.get(str(entity_id)) or get_person_evidence_graph_tool(db, current_user, entity_id)
 
                     # Combine skills and text for matching
                     graph_skills = [s.lower() for s in ev_graph.get("skills", [])]
