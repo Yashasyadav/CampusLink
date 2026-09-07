@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     """CampusLink AI Application Configuration Settings."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env", "../../.env"),
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     # AI & LLM Provider
     LLM_PROVIDER: str = Field(default="gemini")
     GEMINI_API_KEY: Optional[str] = Field(default=None)
-    GEMINI_MODEL: str = Field(default="gemini-1.5-pro")
+    GEMINI_MODEL: str = Field(default="gemini-3.6-flash")
 
     # Embeddings
     EMBEDDING_PROVIDER: str = Field(default="gemini")
