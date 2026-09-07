@@ -67,6 +67,17 @@ class MatchingService:
                 c_tech = cand.matched_technologies
                 ev_graph = cand.person_evidence_graph or {}
 
+                # Collect candidate technologies from profile + project + solution evidence
+                all_cand_tech = self.scoring_service.collect_candidate_technologies(
+                    candidate_technologies=c_tech,
+                    person_evidence_graph=ev_graph,
+                )
+
+                q_tech_lower = {t.lower().strip() for t in q_tech if t.strip()}
+                matched_tech_list = [t for t in all_cand_tech if t.lower().strip() in q_tech_lower]
+                if not matched_tech_list:
+                    matched_tech_list = c_tech
+
                 has_proj = bool(ev_graph.get("projects")) or any(e.entity_type.upper() == "PROJECT" for e in cand.evidence)
                 has_sol = bool(ev_graph.get("solutions")) or any(e.entity_type.upper() == "PROBLEM_SOLUTION" for e in cand.evidence)
                 has_res = bool(ev_graph.get("research"))
@@ -79,11 +90,12 @@ class MatchingService:
                     query_skills=q_skills,
                     candidate_skills=c_skills,
                     query_technologies=q_tech,
-                    candidate_technologies=c_tech,
+                    candidate_technologies=all_cand_tech,
                     has_project_evidence=has_proj,
                     has_solution_evidence=has_sol,
                     has_research_evidence=has_res,
                     best_evidence_type="PROBLEM_SOLUTION" if has_sol else ("PROJECT" if has_proj else ("RESEARCH" if has_res else "PROFILE")),
+                    person_evidence_graph=ev_graph,
                 )
 
                 if score < MIN_RELEVANCE_THRESHOLD:
@@ -103,7 +115,7 @@ class MatchingService:
                     relevance_score=score,
                     relevance_level=relevance_level,
                     matched_skills=c_skills,
-                    matched_technologies=c_tech,
+                    matched_technologies=matched_tech_list,
                     evidence_items=formatted_ev,
                 )
 
@@ -116,7 +128,7 @@ class MatchingService:
                         relevance_score=score,
                         relevance_level=relevance_level,
                         matched_skills=c_skills,
-                        matched_technologies=c_tech,
+                        matched_technologies=matched_tech_list,
                         matched_domains=q_domains,
                         supporting_evidence=formatted_ev,
                         evidence_strength=ev_strength,

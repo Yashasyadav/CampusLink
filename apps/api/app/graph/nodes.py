@@ -302,23 +302,41 @@ def node_rank_matches(state: DiscoveryGraphState, config: RunnableConfig = None)
     top_people = []
     for cand in state.get("people_results", []):
         c_skills = cand.get("matched_skills", [])
+        c_tech = cand.get("matched_technologies", [])
+        ev_graph = cand.get("person_evidence_graph", {})
         raw_ev = cand.get("evidence", [])
-        has_proj = any(e.get("entity_type", "").upper() == "PROJECT" for e in raw_ev)
-        has_sol = any(e.get("entity_type", "").upper() == "PROBLEM_SOLUTION" for e in raw_ev)
+        has_proj = any(e.get("entity_type", "").upper() == "PROJECT" for e in raw_ev) or bool(ev_graph.get("projects"))
+        has_sol = any(e.get("entity_type", "").upper() == "PROBLEM_SOLUTION" for e in raw_ev) or bool(ev_graph.get("solutions"))
         raw_score = float(raw_ev[0].get("score") if raw_ev else 0.50)
+
+        all_cand_tech = scoring_service.collect_candidate_technologies(
+            candidate_technologies=c_tech,
+            person_evidence_graph=ev_graph,
+        )
+
+        q_tech_lower = {t.lower().strip() for t in q_tech if t.strip()}
+        matched_tech_list = [t for t in all_cand_tech if t.lower().strip() in q_tech_lower]
+        if not matched_tech_list:
+            matched_tech_list = c_tech
 
         score, lvl, ev_str, _ = scoring_service.calculate_score(
             semantic_relevance=raw_score,
             query_skills=q_skills,
             candidate_skills=c_skills,
             query_technologies=q_tech,
-            candidate_technologies=[],
+            candidate_technologies=all_cand_tech,
             has_project_evidence=has_proj,
             has_solution_evidence=has_sol,
+            person_evidence_graph=ev_graph,
         )
 
-        if score < 0.25:
-            continue
+        evidence_service = EvidenceService()
+        formatted_ev = evidence_service.format_evidence_items(
+            candidate_id=str(cand.get("user_id")),
+            candidate_type="PERSON",
+            raw_evidences=raw_ev,
+            candidate_meta={"display_name": cand.get("display_name"), "department": cand.get("department")},
+        )
 
         top_people.append({
             "candidate_id": str(cand.get("user_id")),
@@ -328,10 +346,10 @@ def node_rank_matches(state: DiscoveryGraphState, config: RunnableConfig = None)
             "relevance_score": score,
             "relevance_level": lvl,
             "matched_skills": c_skills,
-            "matched_technologies": [],
+            "matched_technologies": matched_tech_list,
             "matched_domains": q_domains,
             "evidence_strength": ev_str,
-            "supporting_evidence": cand.get("evidence", []),
+            "supporting_evidence": formatted_ev,
             "explanation": f"{lvl} match based on shared technical expertise.",
             "strengths": [f"Skills: {', '.join(c_skills[:3])}"] if c_skills else ["Campus Profile"],
             "limitations": [],

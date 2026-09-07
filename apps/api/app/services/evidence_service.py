@@ -27,17 +27,32 @@ class EvidenceService:
         candidate_meta = candidate_meta or {}
 
         for ev in raw_evidences:
+            if isinstance(ev, dict):
+                entity_type = str(ev.get("entity_type") or "").upper()
+                entity_id = str(ev.get("entity_id") or "")
+                title = str(ev.get("title") or "")
+                raw_snip = str(ev.get("snippet") or "")
+                score = float(ev.get("score") or 0.0)
+                source = str(ev.get("source") or "")
+            else:
+                entity_type = str(getattr(ev, "entity_type", "") or "").upper()
+                entity_id = str(getattr(ev, "entity_id", "") or "")
+                title = str(getattr(ev, "title", "") or "")
+                raw_snip = str(getattr(ev, "snippet", "") or "")
+                score = float(getattr(ev, "score", 0.0) or 0.0)
+                source = str(getattr(ev, "source", "") or "")
+
             # Enforce privacy check: Skip raw resume or private contact snippets
-            snippet = ev.snippet.strip() if ev.snippet else ""
+            snippet = raw_snip.strip()
             if "PRIVATE_RESUME" in snippet or "hidden_contact" in snippet:
                 continue
 
             item = EvidenceItem(
-                source_type=ev.entity_type.upper(),
-                source_id=str(ev.entity_id),
-                source_title=ev.title,
-                snippet=snippet[:300] if snippet else f"Evidence record from {ev.source}",
-                relevance=round(max(0.0, min(1.0, float(ev.score))), 4),
+                source_type=entity_type or candidate_type.upper(),
+                source_id=entity_id or str(candidate_id),
+                source_title=title or "Campus Record",
+                snippet=snippet[:300] if snippet else f"Evidence record from {source or 'search'}",
+                relevance=round(max(0.0, min(1.0, score)), 4),
             )
             formatted.append(item)
 

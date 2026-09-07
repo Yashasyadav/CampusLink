@@ -26,6 +26,46 @@ class ScoringService:
     def __init__(self, weights: Dict[str, float] = None):
         self.weights = weights or MATCHING_WEIGHTS
 
+    @staticmethod
+    def collect_candidate_technologies(
+        candidate_technologies: List[str] = None,
+        person_evidence_graph: Dict[str, Any] = None,
+    ) -> List[str]:
+        """
+        Collects, normalizes, and deduplicates all candidate technology evidence
+        from profile technologies, contributed projects, and authored problem solutions.
+        """
+        all_techs = []
+        if candidate_technologies:
+            all_techs.extend(candidate_technologies)
+
+        if person_evidence_graph and isinstance(person_evidence_graph, dict):
+            for proj in person_evidence_graph.get("projects", []):
+                if isinstance(proj, dict) and "technologies" in proj:
+                    techs = proj.get("technologies", [])
+                    if isinstance(techs, list):
+                        all_techs.extend(techs)
+            for sol in person_evidence_graph.get("solutions", []):
+                if isinstance(sol, dict) and "technologies" in sol:
+                    techs = sol.get("technologies", [])
+                    if isinstance(techs, list):
+                        all_techs.extend(techs)
+
+        seen = set()
+        cleaned = []
+        for t in all_techs:
+            if not t:
+                continue
+            s_clean = str(t).strip()
+            if not s_clean:
+                continue
+            key = s_clean.lower()
+            if key not in seen:
+                seen.add(key)
+                cleaned.append(s_clean)
+
+        return cleaned
+
     def calculate_score(
         self,
         semantic_relevance: float,
@@ -37,6 +77,7 @@ class ScoringService:
         has_solution_evidence: bool = False,
         has_research_evidence: bool = False,
         best_evidence_type: str = "PROFILE",
+        person_evidence_graph: Dict[str, Any] = None,
     ) -> Tuple[float, str, str, Dict[str, float]]:
         """
         Calculates a deterministic relevance score normalized from 0.0 to 1.0.
@@ -44,6 +85,12 @@ class ScoringService:
         Returns:
             Tuple of (final_score, relevance_level, evidence_strength, breakdown_dict)
         """
+        # Collect and deduplicate candidate technologies including relational evidence graph
+        if person_evidence_graph:
+            candidate_technologies = self.collect_candidate_technologies(
+                candidate_technologies=candidate_technologies,
+                person_evidence_graph=person_evidence_graph,
+            )
         # 1. Semantic / problem statement relevance (0.0 to 1.0)
         raw_sem = float(semantic_relevance)
         if 0.0 < raw_sem < 0.35:
