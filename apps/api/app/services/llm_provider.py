@@ -31,20 +31,31 @@ class LLMProvider(abc.ABC):
         pass
 
 
+class GeminiProviderError(Exception):
+    """Custom exception raised for Gemini API provider configuration or execution failures."""
+    pass
+
+
 class GeminiLLMProvider(LLMProvider):
     """Concrete LLM provider using Google GenAI SDK."""
 
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
         self._api_key = api_key or settings.GEMINI_API_KEY
-        self._model = model or settings.GEMINI_MODEL or "gemini-1.5-pro"
+        self._model = model or settings.GEMINI_MODEL or "gemini-3.6-flash"
         self._client = None
 
-        if self._api_key and self._api_key != "your_gemini_api_key_here":
-            try:
-                from google import genai
-                self._client = genai.Client(api_key=self._api_key)
-            except Exception as exc:
-                logger.warning(f"Failed to initialize GenAI LLM client: {exc}")
+        if not self._api_key or self._api_key == "your_gemini_api_key_here":
+            raise GeminiProviderError(
+                "GEMINI_API_KEY is missing or unconfigured for GeminiLLMProvider."
+            )
+
+        try:
+            from google import genai
+            self._client = genai.Client(api_key=self._api_key)
+            logger.info(f"Initialized GeminiLLMProvider with model='{self._model}'")
+        except Exception as exc:
+            logger.error(f"Failed to initialize GenAI LLM client for model='{self._model}': {exc}")
+            raise GeminiProviderError(f"Failed to initialize Google GenAI SDK client: {exc}") from exc
 
     @property
     def model_name(self) -> str:
@@ -52,25 +63,29 @@ class GeminiLLMProvider(LLMProvider):
 
     def generate_text(self, prompt: str) -> str:
         if self._client is None:
-            logger.warning("Gemini LLM client uninitialized. Falling back to FakeLLMProvider.")
-            return FakeLLMProvider(model=self._model).generate_text(prompt)
+            raise GeminiProviderError("Gemini LLM client is uninitialized.")
 
         try:
             response = self._client.models.generate_content(
                 model=self._model,
                 contents=prompt,
             )
-            return response.text if hasattr(response, "text") and response.text else ""
+            text = response.text if hasattr(response, "text") and response.text else ""
+            if not text:
+                raise GeminiProviderError(f"Gemini API returned empty text response for model='{self._model}'.")
+            return text
+        except GeminiProviderError:
+            raise
         except Exception as exc:
-            logger.error(f"Error calling Gemini generate_content: {exc}")
-            return FakeLLMProvider(model=self._model).generate_text(prompt)
+            logger.error(f"Error calling Gemini generate_content for model='{self._model}': {exc}")
+            raise GeminiProviderError(f"Gemini API request failed for model='{self._model}': {exc}") from exc
 
     def generate_structured(self, prompt: str, response_schema: Type[T]) -> T:
         if self._client is None:
-            return FakeLLMProvider(model=self._model).generate_structured(prompt, response_schema)
+            raise GeminiProviderError("Gemini LLM client is uninitialized.")
 
         try:
-            # Instruct model to produce raw JSON matching schema
+            from google.genai import types
             schema_json = json.dumps(response_schema.model_json_schema(), indent=2)
             structured_prompt = (
                 f"{prompt}\n\n"
@@ -78,7 +93,15 @@ class GeminiLLMProvider(LLMProvider):
                 f"Do NOT include markdown formatting or extra commentary.\n"
                 f"JSON Schema:\n{schema_json}"
             )
-            raw_text = self.generate_text(structured_prompt)
+            config = types.GenerateContentConfig(
+                response_mime_type="application/json",
+            )
+            response = self._client.models.generate_content(
+                model=self._model,
+                contents=structured_prompt,
+                config=config,
+            )
+            raw_text = response.text if hasattr(response, "text") and response.text else ""
             clean_text = raw_text.strip()
 
             if clean_text.startswith("```json"):
@@ -90,15 +113,19 @@ class GeminiLLMProvider(LLMProvider):
 
             data = json.loads(clean_text.strip())
             return response_schema.model_validate(data)
+        except GeminiProviderError:
+            raise
         except Exception as exc:
-            logger.error(f"Structured output parsing failed: {exc}. Falling back to FakeLLMProvider.")
-            return FakeLLMProvider(model=self._model).generate_structured(prompt, response_schema)
+            logger.error(f"Structured output parsing failed for model='{self._model}': {exc}")
+            raise GeminiProviderError(
+                f"Structured output generation/parsing failed for model='{self._model}': {exc}"
+            ) from exc
 
 
 class FakeLLMProvider(LLMProvider):
     """Deterministic mock LLM provider for fast offline testing and fallback."""
 
-    def __init__(self, model: str = "gemini-1.5-pro"):
+    def __init__(self, model: str = "gemini-3.6-flash"):
         self._model = model
 
     @property
@@ -211,8 +238,21 @@ class FakeLLMProvider(LLMProvider):
 
 def get_llm_provider() -> LLMProvider:
     """Factory method to resolve configured LLM provider."""
-    if not settings.GEMINI_API_KEY or settings.GEMINI_API_KEY == "your_gemini_api_key_here":
-        logger.info("No active GEMINI_API_KEY found, using FakeLLMProvider.")
-        return FakeLLMProvider(model=settings.GEMINI_MODEL)
+    provider_type = (settings.LLM_PROVIDER or "gemini").lower().strip()
 
-    return GeminiLLMProvider(api_key=settings.GEMINI_API_KEY, model=settings.GEMINI_MODEL)
+    if provider_type == "fake":
+        logger.info(f"Resolved LLM provider: FakeLLMProvider (model={settings.GEMINI_MODEL})")
+        return FakeLLMProvider(model=settings.GEMINI_MODEL)
+    elif provider_type == "gemini":
+        if not settings.GEMINI_API_KEY or settings.GEMINI_API_KEY == "your_gemini_api_key_here":
+            raise GeminiProviderError(
+                "LLM_PROVIDER is configured as 'gemini', but GEMINI_API_KEY is missing or unconfigured."
+            )
+        logger.info(f"Resolved LLM provider: GeminiLLMProvider (model={settings.GEMINI_MODEL})")
+        return GeminiLLMProvider(api_key=settings.GEMINI_API_KEY, model=settings.GEMINI_MODEL)
+    else:
+        raise ValueError(
+            f"Unsupported or unknown LLM_PROVIDER configuration: '{settings.LLM_PROVIDER}'. "
+            f"Expected 'gemini' or 'fake'."
+        )
+
