@@ -36,18 +36,20 @@ class FacilityDiscoveryAgent:
         seen_eq_ids = set()
 
         # Build retrieval queries incorporating resource_needs and technologies
-        search_queries = [query_understanding.original_query]
+        q_orig = query_understanding.original_query.strip()
+        search_queries = [q_orig]
         for rn in (query_understanding.resource_needs or []):
-            if rn and rn.strip() and rn.strip() not in search_queries:
-                search_queries.append(rn.strip())
+            rn_clean = rn.strip()
+            if rn_clean and rn_clean.lower() not in q_orig.lower() and rn_clean not in search_queries:
+                search_queries.append(rn_clean)
         if query_understanding.technologies:
-            tech_q = " ".join(query_understanding.technologies)
-            if tech_q not in search_queries:
+            tech_q = " ".join(query_understanding.technologies).strip()
+            if tech_q and tech_q.lower() not in q_orig.lower() and tech_q not in search_queries:
                 search_queries.append(tech_q)
 
         try:
-            # 1. Search Facilities across query dimensions
-            for q_term in search_queries[:3]:
+            # 1. Search Facilities across query dimensions (limit to top 2 distinct terms)
+            for q_term in search_queries[:2]:
                 fac_res = search_facilities_tool(db, current_user, q_term, limit=candidate_pool_limit)
                 for item in fac_res.results:
                     fid_str = str(item.entity_id)
@@ -70,7 +72,7 @@ class FacilityDiscoveryAgent:
                         ))
 
             # 2. Search Equipment across query dimensions & resolve parent facilities
-            for q_term in search_queries[:3]:
+            for q_term in search_queries[:2]:
                 eq_res = search_equipment_tool(db, current_user, q_term, limit=candidate_pool_limit)
                 for item in eq_res.results:
                     eid_str = str(item.entity_id)
@@ -92,9 +94,18 @@ class FacilityDiscoveryAgent:
                             score=item.score,
                         ))
 
-                    # Resolve parent Facility from discovered equipment
-                    try:
-                        eq_record = db.get(Equipment, item.entity_id)
+            # Batch resolve parent Facilities from discovered equipment in a single query
+            if seen_eq_ids:
+                try:
+                    from sqlalchemy.orm import joinedload
+                    eq_uuids = [uuid.UUID(eid) for eid in seen_eq_ids]
+                    eq_records = (
+                        db.query(Equipment)
+                        .options(joinedload(Equipment.facility).joinedload(Facility.equipment))
+                        .filter(Equipment.id.in_(eq_uuids))
+                        .all()
+                    )
+                    for eq_record in eq_records:
                         if eq_record and eq_record.facility:
                             parent_fac = eq_record.facility
                             pf_id_str = str(parent_fac.id)
@@ -104,18 +115,18 @@ class FacilityDiscoveryAgent:
                                 facilities_list.append({
                                     "id": pf_id_str,
                                     "name": parent_fac.name,
-                                    "snippet": parent_fac.description or parent_fac.capabilities or f"Facility containing {item.title}",
-                                    "score": max(item.score, 0.50),
+                                    "snippet": parent_fac.description or parent_fac.capabilities or f"Facility containing {eq_record.name}",
+                                    "score": 0.75,
                                     "metadata": {
                                         "department": parent_fac.department,
                                         "location": parent_fac.location,
                                         "operating_hours": parent_fac.operating_hours,
                                         "equipment": parent_eq_names,
-                                        "matched_equipment": item.title,
+                                        "matched_equipment": eq_record.name,
                                     },
                                 })
-                    except Exception as parent_exc:
-                        logger.debug(f"Could not resolve parent facility for equipment {item.entity_id}: {parent_exc}")
+                except Exception as parent_exc:
+                    logger.debug(f"Could not resolve parent facilities for equipment: {parent_exc}")
 
             # 3. Direct DB relational matching across resource_needs, technologies, and keywords
             dim_terms = [t.lower().strip() for t in (
@@ -125,7 +136,8 @@ class FacilityDiscoveryAgent:
             ) if len(t.strip()) > 2]
 
             if dim_terms:
-                all_facs = db.query(Facility).all()
+                from sqlalchemy.orm import joinedload
+                all_facs = db.query(Facility).options(joinedload(Facility.equipment)).all()
                 for fac in all_facs:
                     fid_str = str(fac.id)
                     if fid_str in seen_fac_ids:

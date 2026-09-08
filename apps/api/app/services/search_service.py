@@ -335,7 +335,16 @@ class SearchService:
             )
 
         elif entity_type == "FACILITY":
-            fac = db.get(Facility, entity_id)
+            from sqlalchemy.orm import joinedload
+            fac = (
+                db.query(Facility)
+                .options(
+                    joinedload(Facility.equipment),
+                    joinedload(Facility.responsible_user).joinedload(User.profile),
+                )
+                .filter(Facility.id == entity_id)
+                .first()
+            )
             if not fac:
                 return None
 
