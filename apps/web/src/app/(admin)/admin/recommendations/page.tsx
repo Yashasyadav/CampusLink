@@ -14,6 +14,8 @@ import {
   QualityMetricsResponse,
   AdminRecommendationItem
 } from "@/lib/api/feedback";
+import { Button, Input, Select } from "antd";
+import { ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 
 export default function AdminRecommendationsPage() {
   return (
@@ -56,7 +58,7 @@ function AdminRecommendationsContent() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to load audit metrics. Ensure administrator permissions.";
       setError(msg);
-    } fontFinally: {
+    } finally {
       setLoading(false);
     }
   };
@@ -88,14 +90,16 @@ function AdminRecommendationsContent() {
           </p>
         </div>
 
-        <button
+        <Button
+          type="primary"
           onClick={fetchData}
           disabled={loading}
-          className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl transition text-xs shrink-0 self-start md:self-auto"
+          icon={<ReloadOutlined spin={loading} />}
+          size="large"
+          className="self-start md:self-auto"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
           Refresh Audit Metrics
-        </button>
+        </Button>
       </div>
 
       {/* ── ERROR MESSAGE ── */}
@@ -192,42 +196,39 @@ function AdminRecommendationsContent() {
 
         {/* Filter Toolbar */}
         <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <div className="relative md:col-span-2">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-            <input
-              type="text"
-              placeholder="Search query text..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-brand-500 font-medium"
-            />
-          </div>
+          <Input
+            className="md:col-span-2"
+            prefix={<SearchOutlined />}
+            placeholder="Search query text..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
 
-          <select
+          <Select
             value={entityTypeFilter}
-            onChange={(e) => setEntityTypeFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 font-semibold focus:outline-none focus:border-brand-500"
-          >
-            <option value="">All Entity Types</option>
-            <option value="PEOPLE">People</option>
-            <option value="PROJECT">Projects</option>
-            <option value="RESEARCH">Research</option>
-            <option value="FACILITY">Facilities</option>
-            <option value="SOLUTION">Solutions</option>
-          </select>
+            onChange={setEntityTypeFilter}
+            options={[
+              { value: "", label: "All Entity Types" },
+              { value: "PEOPLE", label: "People" },
+              { value: "PROJECT", label: "Projects" },
+              { value: "RESEARCH", label: "Research" },
+              { value: "FACILITY", label: "Facilities" },
+              { value: "SOLUTION", label: "Solutions" },
+            ]}
+          />
 
-          <select
+          <Select
             value={flagFilter}
-            onChange={(e) => setFlagFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 font-semibold focus:outline-none focus:border-brand-500"
-          >
-            <option value="">All Quality Flags</option>
-            <option value="LOW_EVIDENCE">Low Evidence</option>
-            <option value="WEAK_SKILL_MATCH">Weak Skill Match</option>
-            <option value="LOW_SEMANTIC_RELEVANCE">Low Relevance</option>
-            <option value="NEGATIVE_USER_FEEDBACK">Negative Feedback</option>
-            <option value="EXPLANATION_MISSING">Explanation Missing</option>
-          </select>
+            onChange={setFlagFilter}
+            options={[
+              { value: "", label: "All Quality Flags" },
+              { value: "LOW_EVIDENCE", label: "Low Evidence" },
+              { value: "WEAK_SKILL_MATCH", label: "Weak Skill Match" },
+              { value: "LOW_SEMANTIC_RELEVANCE", label: "Low Relevance" },
+              { value: "NEGATIVE_USER_FEEDBACK", label: "Negative Feedback" },
+              { value: "EXPLANATION_MISSING", label: "Explanation Missing" },
+            ]}
+          />
         </form>
 
         {/* Audit Log Table */}

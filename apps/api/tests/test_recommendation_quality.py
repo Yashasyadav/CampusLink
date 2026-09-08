@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.main import app
 from app.db.session import sync_engine
 from app.models.users import User, UserRole, UserStatus
+from app.models.captcha import Captcha, CaptchaChallenge
 from app.models.recommendation import RecommendationEvent
 from app.models.feedback import RecommendationFeedback, FeedbackType
 from app.repositories.recommendation_repository import RecommendationRepository
@@ -23,6 +24,24 @@ from app.schemas.feedback import FeedbackType as SchemaFeedbackType, QualityFlag
 # ============================================================
 # TEST FIXTURES & HELPERS
 # ============================================================
+
+def captcha_login_payload(c: TestClient, email: str, password: str) -> dict:
+    response = c.get("/api/v1/auth/captcha")
+    assert response.status_code == 200
+    captcha = response.json()["captcha"]
+    with Session(sync_engine) as db:
+        challenge = db.execute(
+            select(CaptchaChallenge).where(
+                CaptchaChallenge.challenge_token == captcha["challengeToken"]
+            )
+        ).scalar_one()
+        expected = db.get(Captcha, challenge.captcha_id).captcha_text
+    return {
+        "email": email,
+        "password": password,
+        "captchaToken": captcha["challengeToken"],
+        "captchaValue": expected,
+    }
 
 @pytest.fixture
 def student_context():
@@ -100,7 +119,7 @@ def admin_context():
 
     login_resp = c.post(
         "/api/v1/auth/login",
-        json={"email": email, "password": password},
+        json=captcha_login_payload(c, email, password),
     )
     assert login_resp.status_code == 200
 

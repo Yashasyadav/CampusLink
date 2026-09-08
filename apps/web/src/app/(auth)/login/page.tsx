@@ -1,38 +1,144 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
 import { ConfigProvider, Form, Input, Button, Alert, Typography } from "antd";
-import { Sparkles, ShieldCheck, Cpu } from "lucide-react";
+import { Sparkles, ShieldCheck, Cpu, RefreshCw } from "lucide-react";
 import {
   MailOutlined,
   LockOutlined,
   ArrowRightOutlined,
 } from "@ant-design/icons";
+import { fetchApi, ApiError } from "@/lib/api-client";
 import Background3DCanvas from "@/components/background-3d";
 import Card3DCanvas from "@/components/card-3d-canvas";
 
 const { Title, Text, Paragraph } = Typography;
 
+type CaptchaChallenge = {
+  challengeToken: string;
+  image?: string;
+  display?: string;
+};
+
+type CaptchaResponse = {
+  success: boolean;
+  captcha: CaptchaChallenge;
+};
+
+type LoginFailureData = {
+  error?: string;
+  message?: string;
+  nextCaptcha?: CaptchaChallenge;
+};
+
 export default function LoginPage() {
   const { login } = useAuth();
+  const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [captcha, setCaptcha] = useState<CaptchaChallenge | null>(null);
+  const [captchaLoading, setCaptchaLoading] = useState(false);
+  const [captchaError, setCaptchaError] = useState(false);
+  const [captchaShake, setCaptchaShake] = useState(false);
+  const captchaInputRef = useRef<any>(null);
 
-  const onFinish = async (values: { email?: string; password?: string }) => {
-    const { email, password } = values;
+  const focusCaptcha = () => {
+    window.setTimeout(() => captchaInputRef.current?.focus?.(), 40);
+  };
+
+  const fetchCaptcha = async (
+    endpoint: "/api/v1/auth/captcha" | "/api/v1/auth/captcha/refresh",
+    options: RequestInit = {}
+  ) => {
+    const headers = {
+      "Content-Type": "application/json",
+      ...(options.headers as Record<string, string>),
+    };
+
+    const sameOriginResponse = await fetch(endpoint, {
+      credentials: "include",
+      ...options,
+      headers,
+    });
+    if (sameOriginResponse.ok) {
+      return (await sameOriginResponse.json()) as CaptchaResponse;
+    }
+
+    return fetchApi<CaptchaResponse>(endpoint, options);
+  };
+
+  const loadCaptcha = async () => {
+    try {
+      setCaptchaLoading(true);
+      const res = await fetchCaptcha("/api/v1/auth/captcha");
+      setCaptcha(res.captcha);
+      setCaptchaError(false);
+      form.setFieldValue("captchaValue", "");
+    } catch {
+      setError("Could not load CAPTCHA. Please refresh it and try again.");
+    } finally {
+      setCaptchaLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCaptcha();
+  }, []);
+
+  const refreshCaptcha = async () => {
+    try {
+      setCaptchaLoading(true);
+      const res = await fetchCaptcha("/api/v1/auth/captcha/refresh", {
+        method: "POST",
+        body: JSON.stringify({ captchaToken: captcha?.challengeToken }),
+      });
+      setCaptcha(res.captcha);
+      setCaptchaError(false);
+      form.setFieldValue("captchaValue", "");
+      focusCaptcha();
+    } catch {
+      setError("Could not refresh CAPTCHA. Please try again.");
+    } finally {
+      setCaptchaLoading(false);
+    }
+  };
+
+  const applyNextCaptcha = (nextCaptcha?: CaptchaChallenge) => {
+    if (nextCaptcha) {
+      setCaptcha(nextCaptcha);
+    }
+    form.setFieldValue("captchaValue", "");
+    setCaptchaError(true);
+    setCaptchaShake(true);
+    window.setTimeout(() => setCaptchaShake(false), 420);
+    focusCaptcha();
+  };
+
+  const onFinish = async (values: { email?: string; password?: string; captchaValue?: string }) => {
+    const { email, password, captchaValue } = values;
     if (!email || !password) {
       setError("Please fill in both email and password.");
+      return;
+    }
+    if (!captcha?.challengeToken || !captchaValue?.trim()) {
+      setError("Please enter the CAPTCHA.");
+      setCaptchaError(true);
+      focusCaptcha();
       return;
     }
 
     try {
       setError(null);
       setLoading(true);
-      await login(email, password);
+      await login(email, password, captcha.challengeToken, captchaValue);
     } catch (err: any) {
-      setError(err?.message || "Failed to log in. Please check your credentials.");
+      const data = err instanceof ApiError ? (err.data as LoginFailureData) : undefined;
+      if (data?.error === "captcha_invalid" || data?.nextCaptcha) {
+        applyNextCaptcha(data.nextCaptcha);
+      }
+      setError(data?.message || err?.message || "Failed to log in. Please check your credentials.");
     } finally {
       setLoading(false);
     }
@@ -87,8 +193,8 @@ export default function LoginPage() {
 
             <div className="relative z-10 space-y-6">
               <Link href="/" className="inline-flex items-center gap-3 group">
-                <div className="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-xl border border-white/30 flex items-center justify-center text-white shadow-xl group-hover:scale-105 transition-transform duration-300">
-                  <Sparkles className="w-6 h-6 text-orange-400 animate-pulse" />
+                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-xl group-hover:scale-105 transition-transform duration-300 overflow-hidden border border-white/40">
+                  <img src="/ksrct-logo.png" alt="KSRCT Logo" className="h-11 w-11 object-contain" />
                 </div>
                 <span className="font-extrabold text-2xl tracking-tight text-white">
                   CampusLink <span className="text-orange-400">AI</span>
@@ -145,6 +251,7 @@ export default function LoginPage() {
             )}
 
             <Form
+              form={form}
               layout="vertical"
               onFinish={onFinish}
               requiredMark={false}
@@ -180,8 +287,61 @@ export default function LoginPage() {
                 />
               </Form.Item>
 
+              <Form.Item
+                htmlFor="captcha"
+                label={
+                  <div className="flex items-center justify-between w-full">
+                    <Text strong className="text-xs uppercase tracking-wider text-slate-700">CAPTCHA</Text>
+                    <button
+                      type="button"
+                      aria-label="Refresh CAPTCHA"
+                      onClick={refreshCaptcha}
+                      disabled={captchaLoading}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-600 hover:bg-blue-50 disabled:opacity-50 transition"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${captchaLoading ? "animate-spin" : ""}`} />
+                    </button>
+                  </div>
+                }
+              >
+                <div className={`space-y-2 ${captchaShake ? "captcha-shake" : ""}`}>
+                  <div className="h-[70px] rounded-xl border border-slate-200 bg-blue-50/70 flex items-center justify-center overflow-hidden">
+                    {captcha?.image ? (
+                      <img src={captcha.image} alt="CAPTCHA challenge" className="h-full w-full object-contain" />
+                    ) : (
+                      <Text className="font-bold tracking-[0.25em] text-blue-700">
+                        {captchaLoading ? "Loading" : captcha?.display || "Unavailable"}
+                      </Text>
+                    )}
+                  </div>
+                  <Form.Item
+                    name="captchaValue"
+                    rules={[{ required: true, message: "Please enter the CAPTCHA" }]}
+                    noStyle
+                  >
+                    <Input
+                      ref={captchaInputRef}
+                      id="captcha"
+                      placeholder="Enter CAPTCHA"
+                      autoComplete="off"
+                      maxLength={20}
+                      onChange={() => {
+                        setCaptchaError(false);
+                        if (error === "Incorrect CAPTCHA. Please try again.") {
+                          setError(null);
+                        }
+                      }}
+                      className={`rounded-xl border-slate-200 hover:border-blue-500 focus:border-blue-600 transition ${
+                        captchaError ? "!border-rose-400 !shadow-rose-100" : ""
+                      }`}
+                    />
+                  </Form.Item>
+                </div>
+              </Form.Item>
+
               <Form.Item style={{ marginTop: "28px", marginBottom: "8px" }}>
                 <Button
+                  id="campuslink-signin-btn"
                   type="primary"
                   htmlType="submit"
                   loading={loading}

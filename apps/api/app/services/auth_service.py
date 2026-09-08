@@ -76,6 +76,21 @@ class AuthService:
 
         return user, access_token, refresh_token
 
+    async def issue_tokens_for_user(self, user: User) -> Tuple[str, str]:
+        """Issues access and refresh tokens for an already verified user."""
+        await self.user_repo.update_last_login(user.id)
+        access_token = create_token(
+            subject=str(user.id),
+            token_type="access",
+            extra_claims={"role": user.role.value},
+        )
+        refresh_token = create_token(
+            subject=str(user.id),
+            token_type="refresh",
+            extra_claims={"role": user.role.value},
+        )
+        return access_token, refresh_token
+
     @staticmethod
     def calculate_profile_completion(user: User, profile: Optional[Profile]) -> bool:
         """Determines if user profile onboarding requirements are satisfied.

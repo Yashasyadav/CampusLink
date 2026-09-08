@@ -18,6 +18,7 @@ from app.models import (
     ResearchItem, ResearchStatus, ResearchVisibility, PublicationType, ResearchAuthor,
     ProblemSolution, KnowledgeVisibility, ProblemSolutionStatus, ProblemSolutionSkill, ProblemSolutionTechnology,
     Connection, ConnectionStatus, Embedding,
+    Captcha, CaptchaRotationState,
 )
 
 from app.core.security import hash_password
@@ -25,6 +26,48 @@ from app.core.security import hash_password
 logger = logging.getLogger("campuslink.seed")
 
 E2E_METADATA_MARKER = "CAMPUSLINK_E2E_V1"
+CAPTCHA_VALUES = [
+    "K7P4X",
+    "M9Q2R",
+    "T5N8A",
+    "B6Y3K",
+    "H8D2P",
+    "W4F7M",
+    "C9R5T",
+    "X3K8N",
+    "P6A4Z",
+    "R7M2Q",
+]
+
+
+def seed_captchas(session: Session):
+    """Ensure the permanent CAPTCHA master set contains exactly 10 active values."""
+    now = datetime.now(timezone.utc)
+    session.query(Captcha).filter(~Captcha.captcha_text.in_(CAPTCHA_VALUES)).update(
+        {"is_active": False, "updated_at": now},
+        synchronize_session=False,
+    )
+    for index, value in enumerate(CAPTCHA_VALUES, start=1):
+        captcha = session.query(Captcha).filter(Captcha.captcha_text == value).one_or_none()
+        if captcha:
+            captcha.order_index = index
+            captcha.is_active = True
+            captcha.updated_at = now
+        else:
+            session.add(
+                Captcha(
+                    captcha_text=value,
+                    order_index=index,
+                    is_active=True,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+
+    state = session.get(CaptchaRotationState, 1)
+    if not state:
+        session.add(CaptchaRotationState(id=1, current_index=0, updated_at=now))
+    session.commit()
 
 
 def clear_existing_data(session: Session):
@@ -59,6 +102,8 @@ def run_seed(force: bool = False):
     try:
         if force:
             clear_existing_data(session)
+
+        seed_captchas(session)
 
         existing_users = session.query(User).count()
         if existing_users > 0 and not force:

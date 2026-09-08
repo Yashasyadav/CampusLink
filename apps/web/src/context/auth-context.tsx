@@ -9,7 +9,7 @@ interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
   error: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, captchaToken: string, captchaValue: string) => Promise<void>;
   register: (email: string, password: string, role: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -42,13 +42,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshUser();
   }, [refreshUser]);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, captchaToken: string, captchaValue: string) => {
     try {
       setError(null);
       setLoading(true);
       const res = await fetchApi<{ user: UserProfile; message: string }>("/api/v1/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, captchaToken, captchaValue }),
         credentials: "include",
       });
       setUser(res.user);
