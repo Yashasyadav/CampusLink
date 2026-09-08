@@ -4,10 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/layout/app-shell";
 import { ProtectedRoute } from "@/components/layout/protected-route";
+import { Input, Button, Tag, Alert, ConfigProvider, Card } from "antd";
 import {
   Compass, Sparkles, User, FolderGit2, BookOpen,
   Building2, ArrowRight, Loader2, AlertCircle,
-  Tag, ShieldCheck, ChevronDown, ChevronUp, Zap,
+  LucideTag, ShieldCheck, ChevronDown, ChevronUp, Zap,
   TerminalSquare, Layers, Network, CheckCircle2,
   HelpCircle, ExternalLink, Lightbulb, Wrench,
   ThumbsUp, ThumbsDown
@@ -63,11 +64,18 @@ function DiscoverContent() {
     <div className="max-w-page mx-auto px-6 md:px-10 py-8 space-y-10 animate-fade-in">
 
       {/* ── HERO / QUERY BAR ── */}
-      <div
-        className={`relative overflow-hidden rounded-3xl transition-all duration-300 ${
-          matchingData ? "p-6 md:p-8" : "p-8 md:p-12"
-        } text-white`}
-        style={{ background: "linear-gradient(135deg, #1E40AF 0%, #2563EB 50%, #1D4ED8 100%)" }}
+      <Card
+        bordered={false}
+        className="relative overflow-hidden transition-all duration-300 border-none shadow-xl"
+        style={{ 
+          background: "linear-gradient(135deg, #1E40AF 0%, #2563EB 50%, #1D4ED8 100%)",
+          borderRadius: 24,
+        }}
+        styles={{
+          body: {
+            padding: matchingData ? "24px 32px" : "32px 48px",
+          }
+        }}
       >
         <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-white/5 pointer-events-none" />
         <div className="absolute -bottom-10 -left-10 w-48 h-48 rounded-full bg-orange-500/10 pointer-events-none" />
@@ -90,53 +98,62 @@ function DiscoverContent() {
         </div>
 
         {/* Search input form */}
-        <div className="relative z-10 mt-4">
-          <form onSubmit={(e) => { e.preventDefault(); handleDiscover(); }}>
-            <div className="flex items-center bg-white rounded-2xl p-1.5 shadow-xl border border-white/20">
-              <Compass className="w-5 h-5 text-blue-600 ml-4 shrink-0" />
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Describe your campus problem or research need…"
-                className="flex-1 bg-transparent px-4 py-3.5 text-slate-900 placeholder-slate-400 focus:outline-none text-[15px] font-medium"
-              />
-              <button
-                type="submit"
-                disabled={loading || !query.trim()}
-                className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-40 text-white font-bold px-6 py-3 rounded-xl transition shadow-blue text-[13px] shrink-0"
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-orange-300" />}
-                Discover
-              </button>
-            </div>
-          </form>
+        <div className="relative z-10 mt-6">
+          <ConfigProvider
+            theme={{
+              token: {
+                colorPrimary: '#2563eb',
+                borderRadius: 12,
+                controlHeightLG: 56,
+              },
+            }}
+          >
+            <Input.Search
+              prefix={<Compass className="w-5 h-5 text-blue-600 mr-2" />}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onSearch={() => handleDiscover()}
+              placeholder="Describe your campus problem or research need…"
+              size="large"
+              enterButton={
+                <Button type="primary" size="large" icon={!loading && <Sparkles className="w-4 h-4" />} loading={loading} style={{ fontWeight: 'bold', padding: '0 24px' }}>
+                  Discover
+                </Button>
+              }
+              className="shadow-xl focus-within:ring-2 focus-within:ring-orange-400/50 rounded-2xl"
+              style={{ padding: '4px', background: 'white', borderRadius: '16px' }}
+            />
+          </ConfigProvider>
 
           {!matchingData && !loading && (
-            <div className="flex flex-wrap gap-2 mt-4">
+            <div className="flex flex-wrap gap-2 mt-4 items-center">
               <span className="text-[12px] font-medium text-blue-200 flex items-center gap-1 mr-1">
                 <Zap className="w-3.5 h-3.5 text-orange-400" /> Try:
               </span>
               {EXAMPLE_QUERIES.map((q) => (
-                <button
+                <Tag
                   key={q}
+                  className="cursor-pointer bg-white/10 hover:bg-white/20 border-white/20 text-blue-100 py-1 px-3 text-[12px] transition"
                   onClick={() => handleDiscover(q)}
-                  className="text-[12px] px-3 py-1.5 rounded-full bg-white/10 backdrop-blur border border-white/20 text-blue-100 hover:bg-white/20 transition line-clamp-1 max-w-xs text-left"
+                  style={{ borderRadius: '100px' }}
                 >
-                  {q}
-                </button>
+                  {q.length > 40 ? q.substring(0, 40) + "..." : q}
+                </Tag>
               ))}
             </div>
           )}
         </div>
-      </div>
+      </Card>
 
       {/* ── ERROR DISPLAY ── */}
       {error && (
-        <div className="flex items-center gap-3 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-sm">
-          <AlertCircle className="w-5 h-5 shrink-0 text-rose-500" />
-          {error}
-        </div>
+        <Alert
+          message="Discovery Failed"
+          description={error}
+          type="error"
+          showIcon
+          className="rounded-2xl border-rose-200"
+        />
       )}
 
       {/* ── LOADING STATE ── */}
@@ -171,7 +188,7 @@ function DiscoverContent() {
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
-                  <Tag className="w-4 h-4 text-blue-600" />
+                  <LucideTag className="w-4 h-4 text-blue-600" />
                 </div>
                 <div>
                   <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">AI Understanding</h2>

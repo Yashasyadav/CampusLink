@@ -41,13 +41,30 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     """User login request payload."""
 
+    model_config = ConfigDict(populate_by_name=True)
+
     email: str = Field(..., description="Registered email address")
     password: str = Field(..., description="User password")
+    captcha_token: str = Field(..., alias="captchaToken", min_length=16, max_length=128)
+    captcha_value: str = Field(..., alias="captchaValue", min_length=1, max_length=20)
 
     @field_validator("email")
     @classmethod
     def normalize_email(cls, v: str) -> str:
         return validate_campus_email(v)
+
+    @field_validator("captcha_token", "captcha_value")
+    @classmethod
+    def trim_captcha_fields(cls, v: str) -> str:
+        return v.strip()
+
+
+class CaptchaRefreshRequest(BaseModel):
+    """Current challenge token to consume before issuing a replacement."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    captcha_token: Optional[str] = Field(default=None, alias="captchaToken", max_length=128)
 
 
 class UserResponse(BaseModel):

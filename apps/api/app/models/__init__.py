@@ -47,6 +47,7 @@ from app.models.connections import Connection, ConnectionStatus
 from app.models.audit import AuditLog
 from app.models.recommendation import RecommendationEvent
 from app.models.feedback import RecommendationFeedback, FeedbackType
+from app.models.captcha import Captcha, CaptchaChallenge, CaptchaRotationState
 
 __all__ = [
     "Base",
@@ -98,4 +99,7 @@ __all__ = [
     "RecommendationEvent",
     "RecommendationFeedback",
     "FeedbackType",
+    "Captcha",
+    "CaptchaChallenge",
+    "CaptchaRotationState",
 ]

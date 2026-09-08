@@ -1,14 +1,79 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  App,
+  Avatar,
+  Button,
+  Card,
+  Col,
+  Descriptions,
+  Empty,
+  Form,
+  Input,
+  Modal,
+  Progress,
+  Row,
+  Segmented,
+  Select,
+  Space,
+  Statistic,
+  Tag,
+  Tooltip,
+  Typography,
+} from "antd";
+import {
+  ArrowRightOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  FolderOpenOutlined,
+  PlusOutlined,
+  ProjectOutlined,
+  SearchOutlined,
+  TeamOutlined,
+} from "@ant-design/icons";
 import { AppShell } from "@/components/layout/app-shell";
 import { ProtectedRoute } from "@/components/layout/protected-route";
-import { Project } from "@/types";
-import { knowledgeService } from "@/services/knowledge";
-import { ApiError } from "@/lib/api-client";
-import { FolderGit2, Plus, Search, Users, ArrowRight, X, ExternalLink } from "lucide-react";
+import { ErrorState } from "@/components/ui/error-state";
 import { CardGridSkeleton, ProjectCardSkeleton } from "@/components/ui/skeletons";
-import { ErrorState, EmptyState } from "@/components/ui/error-state";
+import { ApiError } from "@/lib/api-client";
+import { knowledgeService } from "@/services/knowledge";
+import { Project } from "@/types";
+
+const { Paragraph, Text, Title } = Typography;
+
+type ProjectStatusFilter = "ALL" | Project["status"];
+
+type ProjectFormValues = {
+  title: string;
+  project_type: Project["project_type"];
+  domain?: string;
+  description: string;
+  outcome?: string;
+  technologies?: string;
+  skills?: string;
+  visibility: Project["visibility"];
+  status: Project["status"];
+};
+
+const defaultProjectValues: ProjectFormValues = {
+  title: "",
+  project_type: "ACADEMIC",
+  domain: "",
+  description: "",
+  outcome: "",
+  technologies: "",
+  skills: "",
+  visibility: "PUBLIC",
+  status: "IN_PROGRESS",
+};
+
+const statusOptions: { label: string; value: ProjectStatusFilter }[] = [
+  { label: "All", value: "ALL" },
+  { label: "Active", value: "IN_PROGRESS" },
+  { label: "Completed", value: "COMPLETED" },
+  { label: "Archived", value: "ARCHIVED" },
+];
 
 export default function ProjectsPage() {
   return (
@@ -21,19 +86,18 @@ export default function ProjectsPage() {
 }
 
 function ProjectsContent() {
+  const { message } = App.useApp();
+  const [form] = Form.useForm<ProjectFormValues>();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorStatus, setErrorStatus] = useState<number | undefined>();
   const [searchQuery, setSearchQuery] = useState("");
   const [domainFilter, setDomainFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<ProjectStatusFilter>("ALL");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  const [formData, setFormData] = useState({
-    title: "", project_type: "ACADEMIC", domain: "", problem_statement: "",
-    description: "", methodology: "", outcome: "", technologies: "", skills: "",
-    visibility: "PUBLIC", status: "IN_PROGRESS",
-  });
 
   const fetchProjects = async () => {
     try {
@@ -43,309 +107,380 @@ function ProjectsContent() {
       setProjects(data.items);
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed to load campus projects.";
-      const status = err instanceof ApiError ? err.status : undefined;
       setError(msg);
-      setErrorStatus(status);
+      setErrorStatus(err instanceof ApiError ? err.status : undefined);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchProjects(); }, [domainFilter]);
+  useEffect(() => {
+    fetchProjects();
+  }, [domainFilter]);
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const domains = useMemo(() => {
+    const values = projects.map((project) => project.domain).filter((domain): domain is string => Boolean(domain));
+    return Array.from(new Set(values)).sort();
+  }, [projects]);
+
+  const filtered = useMemo(() => {
+    const needle = searchQuery.trim().toLowerCase();
+    return projects.filter((project) => {
+      const matchesStatus = statusFilter === "ALL" || project.status === statusFilter;
+      const matchesSearch =
+        !needle ||
+        [project.title, project.description, project.domain, project.outcome]
+          .filter(Boolean)
+          .some((value) => value!.toLowerCase().includes(needle));
+      return matchesStatus && matchesSearch;
+    });
+  }, [projects, searchQuery, statusFilter]);
+
+  const stats = useMemo(
+    () => ({
+      total: projects.length,
+      active: projects.filter((project) => project.status === "IN_PROGRESS").length,
+      completed: projects.filter((project) => project.status === "COMPLETED").length,
+      contributors: projects.reduce((sum, project) => sum + project.contributors.length, 0),
+    }),
+    [projects],
+  );
+
+  const handleCreate = async (values: ProjectFormValues) => {
     try {
+      setCreating(true);
       await knowledgeService.createProject({
-        title: formData.title,
-        project_type: formData.project_type as Project["project_type"],
-        domain: formData.domain,
-        problem_statement: formData.problem_statement,
-        description: formData.description,
-        methodology: formData.methodology,
-        outcome: formData.outcome,
-        technologies: formData.technologies.split(",").map((t) => ({ name: t.trim(), normalized_name: t.trim().toLowerCase(), category: null })).filter((t) => t.name) as Project["technologies"],
-        skills: formData.skills.split(",").map((s) => ({ name: s.trim(), skill_id: "", category: null })).filter((s) => s.name) as Project["skills"],
-        visibility: formData.visibility as Project["visibility"],
-        status: formData.status as Project["status"],
+        title: values.title,
+        project_type: values.project_type,
+        domain: values.domain,
+        description: values.description,
+        outcome: values.outcome,
+        technologies: splitCsv(values.technologies).map((name) => ({
+          name,
+          normalized_name: name.toLowerCase(),
+          category: null,
+        })) as Project["technologies"],
+        skills: splitCsv(values.skills).map((name) => ({
+          name,
+          skill_id: "",
+          category: null,
+        })) as Project["skills"],
+        visibility: values.visibility,
+        status: values.status,
       });
       setIsModalOpen(false);
-      setFormData({ title: "", project_type: "ACADEMIC", domain: "", problem_statement: "", description: "", methodology: "", outcome: "", technologies: "", skills: "", visibility: "PUBLIC", status: "IN_PROGRESS" });
+      form.resetFields();
+      message.success("Project created");
       fetchProjects();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Error creating project.";
-      alert(msg);
+      message.error(err instanceof ApiError ? err.message : "Error creating project.");
+    } finally {
+      setCreating(false);
     }
   };
 
-  const filtered = projects.filter((p) =>
-    p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (p.description || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (p.domain || "").toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   return (
-    <div className="max-w-page mx-auto px-6 md:px-10 py-8 space-y-8 animate-fade-in">
-      {/* ── PAGE HEADER ── */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5 border-b border-slate-200 pb-7">
+    <div className="mx-auto max-w-page px-6 py-8 md:px-10">
+      <div className="mb-7 flex flex-col gap-5 border-b border-slate-200 pb-7 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-4">
-          <div className="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
-            <FolderGit2 className="w-5.5 h-5.5 text-indigo-600" style={{ width: 22, height: 22 }} />
-          </div>
+          <span className="page-heading-icon">
+            <FolderOpenOutlined />
+          </span>
           <div>
-            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Campus Projects</h1>
-            <p className="text-slate-500 text-sm mt-0.5">
-              {loading ? "Loading…" : `${projects.length} project${projects.length !== 1 ? "s" : ""} in repository`}
-            </p>
+            <Title level={2} className="!m-0 !text-2xl">
+              Campus Projects
+            </Title>
+            <Text type="secondary">
+              {loading ? "Loading..." : `${projects.length} project${projects.length !== 1 ? "s" : ""} in repository`}
+            </Text>
           </div>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[13px] rounded-xl transition shadow-blue shrink-0"
-        >
-          <Plus className="w-4 h-4" />
+        <Button type="primary" size="large" icon={<PlusOutlined />} onClick={() => setIsModalOpen(true)}>
           New Project
-        </button>
+        </Button>
       </div>
 
-      {/* ── FILTER BAR ── */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search projects by title, description, or domain…"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 text-[13px] transition"
-          />
-        </div>
-        <select
+      <Row gutter={[16, 16]} className="mb-6">
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic title="Total Projects" value={stats.total} prefix={<ProjectOutlined />} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic title="In Progress" value={stats.active} prefix={<ClockCircleOutlined />} valueStyle={{ color: "#2563eb" }} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic title="Completed" value={stats.completed} prefix={<CheckCircleOutlined />} valueStyle={{ color: "#16a34a" }} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic title="Contributors" value={stats.contributors} prefix={<TeamOutlined />} />
+          </Card>
+        </Col>
+      </Row>
+
+      <div className="mb-8 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_260px_auto]">
+        <Input
+          size="large"
+          allowClear
+          prefix={<SearchOutlined />}
+          placeholder="Search projects by title, description, domain, or outcome..."
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+        />
+        <Select
+          size="large"
           value={domainFilter}
-          onChange={(e) => setDomainFilter(e.target.value)}
-          className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-700 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
-        >
-          <option value="">All Domains</option>
-          <option value="IoT">IoT & Embedded Systems</option>
-          <option value="AI">AI & Machine Learning</option>
-          <option value="Robotics">Robotics & Autonomous Systems</option>
-          <option value="Software">Software Engineering</option>
-          <option value="Security">Cybersecurity</option>
-          <option value="Quantum">Quantum Computing</option>
-        </select>
+          onChange={setDomainFilter}
+          options={[
+            { value: "", label: "All Domains" },
+            ...domains.map((domain) => ({ value: domain, label: domain })),
+            { value: "IoT", label: "IoT & Embedded Systems" },
+            { value: "AI", label: "AI & Machine Learning" },
+            { value: "Robotics", label: "Robotics" },
+            { value: "Software", label: "Software" },
+            { value: "Security", label: "Cybersecurity" },
+            { value: "Quantum", label: "Quantum Computing" },
+          ]}
+        />
+        <Segmented
+          size="large"
+          value={statusFilter}
+          onChange={(value) => setStatusFilter(value as ProjectStatusFilter)}
+          options={statusOptions}
+        />
       </div>
 
-      {/* ── CONTENT ── */}
       {loading ? (
         <CardGridSkeleton count={6} Skeleton={ProjectCardSkeleton} />
       ) : error ? (
         <ErrorState status={errorStatus} message={error} onRetry={fetchProjects} />
       ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={FolderGit2}
-          title={searchQuery ? `No projects matching "${searchQuery}"` : "No campus projects yet"}
-          description="Be the first to record a new project!"
-          action={{ label: "Create First Project", onClick: () => setIsModalOpen(true) }}
-        />
+        <Card>
+          <Empty description={searchQuery ? `No projects matching "${searchQuery}"` : "No campus projects found"}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsModalOpen(true)}>
+              Create Project
+            </Button>
+          </Empty>
+        </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <Row gutter={[24, 24]}>
           {filtered.map((project) => (
-            <ProjectCard key={project.id} project={project} onView={() => setSelectedProject(project)} />
+            <Col key={project.id} xs={24} md={12} xl={8}>
+              <ProjectCard project={project} onView={() => setSelectedProject(project)} />
+            </Col>
           ))}
-        </div>
+        </Row>
       )}
 
-      {/* ── CREATE MODAL ── */}
-      {isModalOpen && (
-        <ModalBackdrop onClose={() => setIsModalOpen(false)}>
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-5">
-            <div>
-              <h2 className="text-xl font-bold text-slate-900">Create Campus Project</h2>
-              <p className="text-[12px] text-slate-500 mt-0.5">Add a new project to the campus repository</p>
-            </div>
-            <button onClick={() => setIsModalOpen(false)} className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          <form onSubmit={handleCreate} className="space-y-4">
-            <ModalField label="Project Title" required>
-              <input required type="text" placeholder="e.g. Autonomous Campus Delivery Rover"
-                value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                className={modalInputCls} />
-            </ModalField>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <ModalField label="Type">
-                <select value={formData.project_type} onChange={(e) => setFormData({ ...formData, project_type: e.target.value })} className={modalInputCls}>
-                  <option value="ACADEMIC">Academic</option>
-                  <option value="RESEARCH">Research</option>
-                  <option value="CAPSTONE">Capstone</option>
-                  <option value="ENTREPRENEURIAL">Entrepreneurial</option>
-                  <option value="OPEN_SOURCE">Open Source</option>
-                </select>
-              </ModalField>
-              <ModalField label="Domain">
-                <input type="text" placeholder="e.g. IoT & Embedded Systems"
-                  value={formData.domain} onChange={(e) => setFormData({ ...formData, domain: e.target.value })}
-                  className={modalInputCls} />
-              </ModalField>
-            </div>
-            <ModalField label="Description" required>
-              <textarea required rows={3} placeholder="Detailed project summary…"
-                value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className={modalInputCls} />
-            </ModalField>
-            <ModalField label="Outcome / Results">
-              <input type="text" placeholder="e.g. 95% accurate TinyML model deployed on ESP32"
-                value={formData.outcome} onChange={(e) => setFormData({ ...formData, outcome: e.target.value })}
-                className={modalInputCls} />
-            </ModalField>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <ModalField label="Technologies (comma-separated)">
-                <input type="text" placeholder="ESP32, Python, FastAPI"
-                  value={formData.technologies} onChange={(e) => setFormData({ ...formData, technologies: e.target.value })}
-                  className={modalInputCls} />
-              </ModalField>
-              <ModalField label="Skills Used (comma-separated)">
-                <input type="text" placeholder="Embedded Systems, Circuit Design"
-                  value={formData.skills} onChange={(e) => setFormData({ ...formData, skills: e.target.value })}
-                  className={modalInputCls} />
-              </ModalField>
-            </div>
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-              <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-[13px] transition">
-                Cancel
-              </button>
-              <button type="submit" className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-[13px] shadow-blue transition">
-                Create Project
-              </button>
-            </div>
-          </form>
-        </ModalBackdrop>
-      )}
+      <Modal
+        open={isModalOpen}
+        onCancel={() => setIsModalOpen(false)}
+        title="Create Campus Project"
+        footer={null}
+        width={760}
+        destroyOnClose
+      >
+        <Form<ProjectFormValues>
+          form={form}
+          layout="vertical"
+          requiredMark={false}
+          initialValues={defaultProjectValues}
+          onFinish={handleCreate}
+          className="pt-2"
+        >
+          <Form.Item name="title" label="Project Title" rules={[{ required: true, message: "Enter project title" }]}>
+            <Input placeholder="Autonomous Campus Delivery Rover" />
+          </Form.Item>
 
-      {/* ── DETAIL MODAL ── */}
-      {selectedProject && (
-        <ModalBackdrop onClose={() => setSelectedProject(null)}>
-          <div className="flex items-start justify-between border-b border-slate-100 pb-4 mb-5">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wide">{selectedProject.domain || selectedProject.project_type}</span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${selectedProject.status === "COMPLETED" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
-                  {selectedProject.status}
-                </span>
-              </div>
-              <h2 className="text-xl font-bold text-slate-900">{selectedProject.title}</h2>
-            </div>
-            <button onClick={() => setSelectedProject(null)} className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition shrink-0 ml-4">
-              <X className="w-5 h-5" />
-            </button>
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
+              <Form.Item name="project_type" label="Type">
+                <Select options={[
+                  { value: "ACADEMIC", label: "Academic" },
+                  { value: "RESEARCH", label: "Research" },
+                  { value: "CAPSTONE", label: "Capstone" },
+                  { value: "ENTREPRENEURIAL", label: "Entrepreneurial" },
+                  { value: "OPEN_SOURCE", label: "Open Source" },
+                  { value: "PERSONAL", label: "Personal" },
+                ]} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="status" label="Status">
+                <Select options={[
+                  { value: "PROPOSED", label: "Proposed" },
+                  { value: "IN_PROGRESS", label: "In Progress" },
+                  { value: "COMPLETED", label: "Completed" },
+                  { value: "PAUSED", label: "Paused" },
+                  { value: "ARCHIVED", label: "Archived" },
+                ]} />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item name="domain" label="Domain">
+            <Input placeholder="IoT & Embedded Systems" />
+          </Form.Item>
+
+          <Form.Item name="description" label="Description" rules={[{ required: true, message: "Enter project description" }]}>
+            <Input.TextArea rows={4} placeholder="Detailed project summary..." />
+          </Form.Item>
+
+          <Form.Item name="outcome" label="Outcome / Results">
+            <Input placeholder="95% accurate TinyML model deployed on ESP32" />
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
+              <Form.Item name="technologies" label="Technologies">
+                <Input placeholder="ESP32, Python, FastAPI" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="skills" label="Skills">
+                <Input placeholder="Embedded Systems, Circuit Design" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+            <Button onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button htmlType="submit" type="primary" loading={creating}>
+              Create Project
+            </Button>
           </div>
-          <div className="space-y-5 text-[13px]">
-            <InfoBlock label="Description">{selectedProject.description}</InfoBlock>
-            {selectedProject.outcome && <InfoBlock label="Key Outcome" className="text-emerald-700">{selectedProject.outcome}</InfoBlock>}
-            {selectedProject.technologies.length > 0 && (
-              <div>
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">Technologies</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedProject.technologies.map((t, i) => (
-                    <span key={i} className="px-2.5 py-1 bg-slate-100 text-slate-700 text-[12px] font-medium rounded-lg border border-slate-200">{t.name}</span>
-                  ))}
-                </div>
-              </div>
-            )}
-            {selectedProject.contributors.length > 0 && (
-              <div>
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">Contributors</p>
-                <div className="space-y-2">
-                  {selectedProject.contributors.map((c) => (
-                    <div key={c.id} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                      <div>
-                        <p className="font-bold text-slate-900">{c.full_name || c.email || "Campus User"}</p>
-                        {c.contribution_description && <p className="text-slate-500 text-[11px]">{c.contribution_description}</p>}
-                      </div>
-                      <span className="px-2 py-0.5 text-[10px] bg-blue-50 text-blue-700 border border-blue-200 rounded-md font-bold uppercase">{c.role}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </ModalBackdrop>
-      )}
+        </Form>
+      </Modal>
+
+      <Modal
+        open={!!selectedProject}
+        onCancel={() => setSelectedProject(null)}
+        title={selectedProject?.title}
+        footer={null}
+        width={820}
+      >
+        {selectedProject && <ProjectDetails project={selectedProject} />}
+      </Modal>
     </div>
   );
 }
 
-// ── Project Card ──
 function ProjectCard({ project, onView }: { project: Project; onView: () => void }) {
+  const percent = project.status === "COMPLETED" ? 100 : project.status === "IN_PROGRESS" ? 62 : project.status === "PROPOSED" ? 18 : 0;
+  const color = statusColor(project.status);
+
   return (
-    <div className="group bg-white border border-slate-200 hover:border-slate-300 rounded-2xl p-6 transition-all card-interactive shadow-card flex flex-col justify-between">
+    <Card
+      hoverable
+      className="h-full project-card"
+      styles={{ body: { height: "100%", padding: 24 } }}
+      actions={[
+        <Tooltip key="contributors" title="Contributors">
+          <span><TeamOutlined /> {project.contributors.length}</span>
+        </Tooltip>,
+        <Button key="view" type="link" onClick={onView} className="font-bold">
+          View Details <ArrowRightOutlined />
+        </Button>,
+      ]}
+    >
+      <div className="flex h-full flex-col gap-4">
+        <Space wrap>
+          <Tag color="blue">{project.domain || project.project_type}</Tag>
+          <Tag color={color}>{project.status.replace(/_/g, " ")}</Tag>
+        </Space>
+
+        <div>
+          <Title level={5} className="!mb-2">
+            {project.title}
+          </Title>
+          <Paragraph type="secondary" ellipsis={{ rows: 3 }} className="!mb-0">
+            {project.description}
+          </Paragraph>
+        </div>
+
+        <Progress percent={percent} showInfo={false} strokeColor={progressColor(project.status)} trailColor="#f1f5f9" />
+
+        <Space wrap size={[6, 6]} className="mt-auto">
+          {project.technologies.slice(0, 4).map((item) => (
+            <Tag key={item.name}>{item.name}</Tag>
+          ))}
+          {project.technologies.length > 4 && <Tag>+{project.technologies.length - 4}</Tag>}
+        </Space>
+      </div>
+    </Card>
+  );
+}
+
+function ProjectDetails({ project }: { project: Project }) {
+  return (
+    <Space direction="vertical" size="large" className="w-full">
+      <Space wrap>
+        <Tag color="blue">{project.domain || project.project_type}</Tag>
+        <Tag color={statusColor(project.status)}>{project.status.replace(/_/g, " ")}</Tag>
+        <Tag>{project.visibility.replace(/_/g, " ")}</Tag>
+      </Space>
+
+      <Paragraph className="!mb-0">{project.description}</Paragraph>
+
+      <Descriptions bordered size="small" column={1}>
+        {project.problem_statement && <Descriptions.Item label="Problem Statement">{project.problem_statement}</Descriptions.Item>}
+        {project.methodology && <Descriptions.Item label="Methodology">{project.methodology}</Descriptions.Item>}
+        {project.outcome && <Descriptions.Item label="Outcome">{project.outcome}</Descriptions.Item>}
+        <Descriptions.Item label="Technologies">
+          <Space wrap>{project.technologies.map((item) => <Tag key={item.name}>{item.name}</Tag>)}</Space>
+        </Descriptions.Item>
+        <Descriptions.Item label="Skills">
+          <Space wrap>{project.skills.map((item) => <Tag color="blue" key={item.name}>{item.name}</Tag>)}</Space>
+        </Descriptions.Item>
+      </Descriptions>
+
       <div>
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <span className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 uppercase">
-            {project.domain || project.project_type}
-          </span>
-          <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full uppercase ${
-            project.status === "COMPLETED" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-amber-50 text-amber-700 border border-amber-200"
-          }`}>
-            {project.status}
-          </span>
+        <Text strong>Contributors</Text>
+        <div className="mt-3 space-y-2">
+          {project.contributors.length === 0 ? (
+            <Text type="secondary">No contributors listed.</Text>
+          ) : (
+            project.contributors.map((contributor) => (
+              <div key={contributor.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                <Space>
+                  <Avatar>{(contributor.full_name || contributor.email || "U").slice(0, 2).toUpperCase()}</Avatar>
+                  <div>
+                    <Text strong>{contributor.full_name || contributor.email || "Campus User"}</Text>
+                    {contributor.contribution_description && (
+                      <div><Text type="secondary">{contributor.contribution_description}</Text></div>
+                    )}
+                  </div>
+                </Space>
+                <Tag>{contributor.role.replace(/_/g, " ")}</Tag>
+              </div>
+            ))
+          )}
         </div>
-        <h3 className="text-[15px] font-bold text-slate-900 group-hover:text-blue-600 transition mb-2 leading-snug">{project.title}</h3>
-        <p className="text-slate-500 text-[13px] line-clamp-3 mb-4 leading-relaxed">{project.description}</p>
-        {project.technologies.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-4">
-            {project.technologies.slice(0, 4).map((t, idx) => (
-              <span key={idx} className="px-2 py-0.5 text-[11px] bg-slate-100 text-slate-600 font-medium rounded-md border border-slate-200">{t.name}</span>
-            ))}
-            {project.technologies.length > 4 && (
-              <span className="px-2 py-0.5 text-[11px] bg-slate-100 text-slate-500 font-medium rounded-md border border-slate-200">+{project.technologies.length - 4}</span>
-            )}
-          </div>
-        )}
       </div>
-      <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-[12px] text-slate-500">
-        <div className="flex items-center gap-1.5">
-          <Users className="w-3.5 h-3.5 text-slate-400" />
-          <span>{project.contributors.length} contributor{project.contributors.length !== 1 ? "s" : ""}</span>
-        </div>
-        <button onClick={onView} className="text-blue-600 hover:text-blue-700 font-bold transition inline-flex items-center gap-1">
-          View Details <ArrowRight className="w-3.5 h-3.5" />
-        </button>
-      </div>
-    </div>
+    </Space>
   );
 }
 
-// ── Shared Helpers ──
-const modalInputCls = "w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition";
-
-function ModalField({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-widest mb-1.5">
-        {label}{required && " *"}
-      </label>
-      {children}
-    </div>
-  );
+function splitCsv(value?: string) {
+  return (value || "").split(",").map((item) => item.trim()).filter(Boolean);
 }
 
-function InfoBlock({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
-  return (
-    <div>
-      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">{label}</p>
-      <p className={`text-slate-700 leading-relaxed ${className}`}>{children}</p>
-    </div>
-  );
+function statusColor(status: Project["status"]) {
+  if (status === "COMPLETED") return "green";
+  if (status === "IN_PROGRESS") return "blue";
+  if (status === "ARCHIVED") return "default";
+  if (status === "PAUSED") return "gold";
+  return "cyan";
 }
 
-function ModalBackdrop({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
-      <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 md:p-8 shadow-2xl">
-        {children}
-      </div>
-    </div>
-  );
+function progressColor(status: Project["status"]) {
+  if (status === "COMPLETED") return "#16a34a";
+  if (status === "IN_PROGRESS") return "#2563eb";
+  if (status === "PAUSED") return "#f59e0b";
+  return "#94a3b8";
 }

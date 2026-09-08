@@ -10,6 +10,7 @@ import {
   User, Shield, CheckCircle2, Save, LogOut, Loader2, Mail,
   MapPin, Briefcase, Github, Linkedin, Globe, Eye, EyeOff,
 } from "lucide-react";
+import { Button, Select, Switch, Popconfirm } from "antd";
 import { ProfileSkeleton } from "@/components/ui/skeletons";
 import { ResumeSection } from "@/components/resume/resume-section";
 
@@ -169,12 +170,18 @@ function ProfileContent() {
             </div>
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-2 shrink-0">
-              <button
-                onClick={logout}
-                className="inline-flex items-center gap-2 px-4 py-2 text-[13px] font-semibold text-slate-600 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 border border-slate-200 hover:border-rose-200 rounded-xl transition"
+              <Popconfirm
+                title="Sign Out"
+                description="Are you sure you want to sign out?"
+                onConfirm={logout}
+                okText="Yes"
+                cancelText="No"
+                placement="bottomRight"
               >
-                <LogOut className="w-3.5 h-3.5" /> Sign Out
-              </button>
+                <Button danger icon={<LogOut className="w-3.5 h-3.5" />}>
+                  Sign Out
+                </Button>
+              </Popconfirm>
             </div>
           </div>
         </div>

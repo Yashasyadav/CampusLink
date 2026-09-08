@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { ProtectedRoute } from "@/components/layout/protected-route";
+import { Input, Button, Tag, Card, ConfigProvider, Tabs, Radio, Empty } from "antd";
 import {
   Search as SearchIcon, Sparkles, User, FolderGit2, BookOpen,
   Building2, Wrench, Lightbulb, ArrowRight, Loader2, AlertCircle,
@@ -118,67 +119,65 @@ function SearchContent() {
       </div>
 
       {/* ── SEARCH BAR ── */}
-      <form onSubmit={(e) => { e.preventDefault(); executeSearch(); }} className="space-y-4">
-        <div className="flex items-center bg-white border-2 border-slate-200 rounded-2xl shadow-card focus-within:border-blue-500 focus-within:shadow-blue transition-all" style={{ minHeight: 60 }}>
-          <SearchIcon className="w-5 h-5 text-slate-400 ml-5 shrink-0" />
-          <input
-            type="text"
+      <div className="space-y-4">
+        <ConfigProvider
+          theme={{
+            token: { colorPrimary: '#2563eb', borderRadius: 12, controlHeightLG: 64 },
+          }}
+        >
+          <Input.Search
+            prefix={<SearchIcon className="w-6 h-6 text-slate-400 mr-2" />}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onSearch={() => executeSearch()}
             placeholder="Search people, projects, research papers, labs, equipment, solutions…"
-            className="flex-1 bg-transparent px-4 py-3.5 text-slate-900 placeholder-slate-400 focus:outline-none text-[15px]"
+            size="large"
+            className="shadow-card bg-white rounded-2xl"
+            style={{ borderRadius: '16px', padding: 4 }}
+            enterButton={
+              <Button type="primary" size="large" loading={loading} icon={!loading && <SearchIcon className="w-4 h-4" />} style={{ padding: '0 24px', fontWeight: 'bold' }}>
+                Search
+              </Button>
+            }
           />
-          <button
-            type="submit"
-            disabled={loading || !query.trim()}
-            className="m-2 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white font-bold px-6 py-3 rounded-xl transition shadow-blue text-[13px] shrink-0"
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <SearchIcon className="w-4 h-4" />}
-            Search
-          </button>
-        </div>
+        </ConfigProvider>
 
         {/* Search options */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           {/* Mode toggle */}
           <div className="flex items-center gap-2">
             <span className="text-[12px] font-semibold text-slate-500">Mode:</span>
-            <div className="flex rounded-xl border border-slate-200 overflow-hidden bg-white">
-              {(["HYBRID", "SEMANTIC"] as SearchMode[]).map((m) => (
-                <button key={m} type="button"
-                  onClick={() => setMode(m)}
-                  className={`px-4 py-1.5 text-[12px] font-semibold transition ${
-                    mode === m ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  {m === "HYBRID" ? (
-                    <span className="flex items-center gap-1.5"><Layers className="w-3.5 h-3.5" /> Hybrid</span>
-                  ) : (
-                    <span className="flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> Semantic</span>
-                  )}
-                </button>
-              ))}
-            </div>
+            <Radio.Group 
+              value={mode} 
+              onChange={(e) => setMode(e.target.value)}
+              buttonStyle="solid"
+              size="middle"
+            >
+              <Radio.Button value="HYBRID" className="px-4 font-semibold">
+                <span className="flex items-center gap-1.5"><Layers className="w-3.5 h-3.5" /> Hybrid</span>
+              </Radio.Button>
+              <Radio.Button value="SEMANTIC" className="px-4 font-semibold">
+                <span className="flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> Semantic</span>
+              </Radio.Button>
+            </Radio.Group>
           </div>
 
           {/* Entity type filters */}
           <div className="flex flex-wrap gap-2">
             {ENTITY_TYPES.map(({ id, label, icon: Icon }) => (
-              <button key={id} type="button"
+              <Button
+                key={id}
+                type={selectedTypes.includes(id) ? "primary" : "default"}
+                icon={<Icon className="w-3.5 h-3.5" />}
                 onClick={() => toggleType(id)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition ${
-                  selectedTypes.includes(id)
-                    ? "bg-blue-600 text-white border-blue-600"
-                    : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                }`}
+                style={{ borderRadius: '8px', fontWeight: 600 }}
               >
-                <Icon className="w-3.5 h-3.5" />
                 {label}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
-      </form>
+      </div>
 
       {/* ── RESULTS HEADER & TABS ── */}
       {hasSearched && !loading && !error && total !== null && (
@@ -201,16 +200,22 @@ function SearchContent() {
 
           {/* Tabs */}
           {total > 0 && (
-            <div className="flex flex-wrap gap-2">
-              <TabButton active={activeTab === "ALL"} onClick={() => setActiveTab("ALL")} count={results.length}>
-                All Results
-              </TabButton>
-              {ENTITY_TYPES.filter(({ id }) => countByType(id) > 0).map(({ id, label, icon: Icon }) => (
-                <TabButton key={id} active={activeTab === id} onClick={() => setActiveTab(id)} count={countByType(id)}>
-                  <Icon className="w-3.5 h-3.5" /> {label}
-                </TabButton>
-              ))}
-            </div>
+            <Tabs 
+              activeKey={activeTab} 
+              onChange={(key) => setActiveTab(key as any)}
+              size="middle"
+              className="mt-4"
+              items={[
+                { 
+                  label: <span className="font-semibold">All Results <Tag color="blue" className="ml-2 rounded-full border-0 font-bold">{results.length}</Tag></span>,
+                  key: "ALL", 
+                },
+                ...ENTITY_TYPES.filter(({ id }) => countByType(id) > 0).map(({ id, label, icon: Icon }) => ({
+                  label: <span className="flex items-center gap-1.5 font-semibold"><Icon className="w-3.5 h-3.5" /> {label} <Tag color="blue" className="ml-2 rounded-full border-0 font-bold">{countByType(id)}</Tag></span>,
+                  key: id
+                }))
+              ]}
+            />
           )}
         </div>
       )}
@@ -227,23 +232,34 @@ function SearchContent() {
 
       {/* ── EMPTY INITIAL STATE ── */}
       {!hasSearched && !loading && (
-        <div className="text-center py-16 bg-white border border-slate-200 rounded-3xl shadow-card">
-          <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-5">
-            <SearchIcon className="w-7 h-7 text-blue-500" />
+        <Card className="rounded-3xl shadow-card border-slate-200" bordered={false}>
+          <div className="text-center py-8">
+            <Empty
+              image={<div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto"><SearchIcon className="w-8 h-8 text-blue-500" /></div>}
+              description={
+                <div className="space-y-2 mt-4">
+                  <h3 className="text-base font-bold text-slate-900">Search all campus knowledge</h3>
+                  <p className="text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">
+                    Hybrid search across people, projects, research papers, facilities, equipment, and solutions.
+                  </p>
+                </div>
+              }
+            />
+            <div className="flex flex-wrap justify-center gap-2 mt-8">
+              {["Machine Learning", "ESP32", "Lab Equipment", "Quantum Computing"].map((q) => (
+                <Button 
+                  key={q} 
+                  onClick={() => { setQuery(q); executeSearch(q); }}
+                  icon={<Zap className="w-3.5 h-3.5 text-orange-400" />}
+                  shape="round"
+                  className="font-medium text-slate-600"
+                >
+                  {q}
+                </Button>
+              ))}
+            </div>
           </div>
-          <h3 className="text-base font-bold text-slate-900 mb-2">Search all campus knowledge</h3>
-          <p className="text-sm text-slate-500 max-w-sm mx-auto leading-relaxed mb-6">
-            Hybrid search across people, projects, research papers, facilities, equipment, and solutions.
-          </p>
-          <div className="flex flex-wrap justify-center gap-2">
-            {["Machine Learning", "ESP32", "Lab Equipment", "Quantum Computing"].map((q) => (
-              <button key={q} onClick={() => { setQuery(q); executeSearch(q); }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium bg-white border border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50 transition">
-                <Zap className="w-3 h-3 text-orange-400" /> {q}
-              </button>
-            ))}
-          </div>
-        </div>
+        </Card>
       )}
 
       {/* ── NO RESULTS ── */}
@@ -277,7 +293,12 @@ function SearchResultCard({ result }: { result: SearchResultItem }) {
   }[result.entity_type] || "#";
 
   return (
-    <div className="group bg-white border border-slate-200 hover:border-slate-300 rounded-2xl p-5 shadow-card card-interactive transition-all">
+    <Card 
+      bordered={false}
+      className="group border border-slate-200 hover:border-blue-300 shadow-sm hover:shadow-md transition-all"
+      style={{ borderRadius: 16 }}
+      styles={{ body: { padding: 20 } }}
+    >
       <div className="flex items-start gap-4">
         <div className={`w-9 h-9 rounded-xl ${typeConf.bg} border ${typeConf.border} flex items-center justify-center shrink-0 mt-0.5`}>
           <Icon className={`w-4 h-4 ${typeConf.text}`} />
@@ -312,26 +333,8 @@ function SearchResultCard({ result }: { result: SearchResultItem }) {
           </div>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }
 
-function TabButton({
-  active, onClick, count, children,
-}: { active: boolean; onClick: () => void; count: number; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-semibold border transition ${
-        active
-          ? "bg-blue-600 text-white border-blue-600"
-          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-      }`}
-    >
-      {children}
-      <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}>
-        {count}
-      </span>
-    </button>
-  );
-}
+

@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import { AuthProvider } from "@/context/auth-context";
+import { AntdProvider } from "@/components/antd-provider";
+import "antd/dist/reset.css";
 import "./globals.css";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "CampusLink AI — Agentic Expertise Discovery Platform",
   description: "Evidence-backed campus expertise, project matching, facility discovery, and faculty connections.",
+  icons: {
+    icon: "/ksrct-logo.png",
+    shortcut: "/ksrct-logo.png",
+    apple: "/ksrct-logo.png",
+  },
 };
 
 export default function RootLayout({
@@ -16,9 +20,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={inter.className}>
+    <html lang="en">
       <body className="antialiased bg-slate-50 text-slate-900 min-h-screen">
-        <AuthProvider>{children}</AuthProvider>
+        <AntdProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </AntdProvider>
       </body>
     </html>
   );

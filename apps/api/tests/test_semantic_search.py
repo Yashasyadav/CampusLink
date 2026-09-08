@@ -1,10 +1,33 @@
 import uuid
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.main import app
+from app.db.session import sync_engine
+from app.models.captcha import Captcha, CaptchaChallenge
 
 client = TestClient(app)
+
+
+def captcha_login_payload(email: str, password: str) -> dict:
+    response = client.get("/api/v1/auth/captcha")
+    assert response.status_code == 200
+    captcha = response.json()["captcha"]
+    with Session(sync_engine) as db:
+        challenge = db.execute(
+            select(CaptchaChallenge).where(
+                CaptchaChallenge.challenge_token == captcha["challengeToken"]
+            )
+        ).scalar_one()
+        expected = db.get(Captcha, challenge.captcha_id).captcha_text
+    return {
+        "email": email,
+        "password": password,
+        "captchaToken": captcha["challengeToken"],
+        "captchaValue": expected,
+    }
 
 
 @pytest.fixture
@@ -42,9 +65,7 @@ def admin_cookies():
     )
     assert reg.status_code == 201
 
-    from app.db.session import sync_engine
     from app.models.users import User, UserRole
-    from sqlalchemy.orm import Session
 
     with Session(sync_engine) as db:
         db.query(User).filter(User.email == email).update({"role": UserRole.ADMIN})
@@ -52,7 +73,7 @@ def admin_cookies():
 
     login_resp = client.post(
         "/api/v1/auth/login",
-        json={"email": email, "password": password},
+        json=captcha_login_payload(email, password),
     )
     assert login_resp.status_code == 200
     return login_resp.cookies

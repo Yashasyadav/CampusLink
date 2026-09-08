@@ -2,6 +2,7 @@
 
 import React from "react";
 import { AlertCircle, WifiOff, Lock, ShieldOff, ServerCrash, FileQuestion, SearchX, Inbox } from "lucide-react";
+import { Alert, Empty, Button } from "antd";
 
 // ============================================================
 // ERROR STATE
@@ -18,21 +19,22 @@ export function ErrorState({ status, message, onRetry, className = "" }: ErrorSt
   const config = getErrorConfig(status, message);
 
   return (
-    <div className={`flex flex-col items-center justify-center py-20 text-center ${className}`}>
-      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-5 ${config.iconBg}`}>
-        <config.Icon className={`w-7 h-7 ${config.iconColor}`} />
-      </div>
-      <h3 className="text-lg font-bold text-slate-900 mb-2">{config.title}</h3>
-      <p className="text-sm text-slate-500 max-w-sm leading-relaxed mb-6">{config.description}</p>
+    <Empty
+      image={<config.Icon className={`w-12 h-12 ${config.iconColor} mx-auto opacity-50`} />}
+      description={
+        <div className="space-y-2 mt-4 px-4">
+          <h3 className="text-lg font-bold text-slate-900">{config.title}</h3>
+          <p className="text-sm text-slate-500 max-w-sm mx-auto">{config.description}</p>
+        </div>
+      }
+      className={`py-16 ${className}`}
+    >
       {onRetry && (
-        <button
-          onClick={onRetry}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl transition shadow-blue"
-        >
+        <Button onClick={onRetry} type="primary" size="large" className="mt-4 font-semibold px-8" shape="round">
           Try again
-        </button>
+        </Button>
       )}
-    </div>
+    </Empty>
   );
 }
 
@@ -95,15 +97,14 @@ interface InlineErrorProps {
 
 export function InlineError({ message, onDismiss, className = "" }: InlineErrorProps) {
   return (
-    <div className={`flex items-start gap-3 p-4 bg-rose-50 border border-rose-200 rounded-xl ${className}`}>
-      <AlertCircle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
-      <p className="text-sm text-rose-700 flex-1">{message}</p>
-      {onDismiss && (
-        <button onClick={onDismiss} className="text-rose-400 hover:text-rose-600 text-sm font-medium shrink-0">
-          Dismiss
-        </button>
-      )}
-    </div>
+    <Alert
+      message={message}
+      type="error"
+      showIcon
+      closable={!!onDismiss}
+      onClose={onDismiss}
+      className={`rounded-xl border-rose-200 ${className}`}
+    />
   );
 }
 
@@ -125,27 +126,30 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon: Icon = Inbox, title, description, action, className = "" }: EmptyStateProps) {
   return (
-    <div className={`flex flex-col items-center justify-center py-20 text-center ${className}`}>
-      <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-5">
-        <Icon className="w-7 h-7 text-slate-400" />
-      </div>
-      <h3 className="text-base font-bold text-slate-900 mb-2">{title}</h3>
-      {description && (
-        <p className="text-sm text-slate-500 max-w-sm leading-relaxed mb-6">{description}</p>
-      )}
+    <Empty
+      image={<Icon className="w-12 h-12 text-slate-300 mx-auto opacity-50" />}
+      description={
+        <div className="space-y-2 mt-4">
+          <h3 className="text-base font-bold text-slate-900">{title}</h3>
+          {description && (
+            <p className="text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">{description}</p>
+          )}
+        </div>
+      }
+      className={`py-16 ${className}`}
+    >
       {action && (
-        <button
+        <Button
           onClick={action.onClick}
-          className={`inline-flex items-center gap-2 px-5 py-2.5 font-semibold text-sm rounded-xl transition ${
-            action.variant === "secondary"
-              ? "bg-slate-100 hover:bg-slate-200 text-slate-700"
-              : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue"
-          }`}
+          type={action.variant === "secondary" ? "default" : "primary"}
+          size="large"
+          className="mt-4 font-semibold px-6"
+          shape="round"
         >
           {action.label}
-        </button>
+        </Button>
       )}
-    </div>
+    </Empty>
   );
 }
 
@@ -155,23 +159,30 @@ export function EmptyState({ icon: Icon = Inbox, title, description, action, cla
 
 export function NetworkError({ onRetry }: { onRetry?: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-5">
-        <WifiOff className="w-7 h-7 text-slate-400" />
-      </div>
-      <h3 className="text-base font-bold text-slate-900 mb-2">No Connection</h3>
-      <p className="text-sm text-slate-500 max-w-sm leading-relaxed mb-6">
-        Unable to reach CampusLink servers. Please check your internet connection.
-      </p>
+    <Empty
+      image={<WifiOff className="w-12 h-12 text-slate-300 mx-auto opacity-50" />}
+      description={
+        <div className="space-y-2 mt-4">
+          <h3 className="text-base font-bold text-slate-900">No Connection</h3>
+          <p className="text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">
+            Unable to reach CampusLink servers. Please check your internet connection.
+          </p>
+        </div>
+      }
+      className="py-16"
+    >
       {onRetry && (
-        <button
+        <Button
           onClick={onRetry}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl transition shadow-blue"
+          type="primary"
+          size="large"
+          className="mt-4 font-semibold px-8"
+          shape="round"
         >
           Retry
-        </button>
+        </Button>
       )}
-    </div>
+    </Empty>
   );
 }
 
@@ -181,17 +192,20 @@ export function NetworkError({ onRetry }: { onRetry?: () => void }) {
 
 export function SearchEmpty({ query }: { query?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-5">
-        <SearchX className="w-7 h-7 text-slate-400" />
-      </div>
-      <h3 className="text-base font-bold text-slate-900 mb-2">
-        {query ? `No results for "${query}"` : "No results found"}
-      </h3>
-      <p className="text-sm text-slate-500 max-w-sm leading-relaxed">
-        Try adjusting your search terms or removing filters. CampusLink searches across
-        profiles, projects, research, facilities, and solutions.
-      </p>
-    </div>
+    <Empty
+      image={<SearchX className="w-12 h-12 text-slate-300 mx-auto opacity-50" />}
+      description={
+        <div className="space-y-2 mt-4">
+          <h3 className="text-base font-bold text-slate-900">
+            {query ? `No results for "${query}"` : "No results found"}
+          </h3>
+          <p className="text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">
+            Try adjusting your search terms or removing filters. CampusLink searches across
+            profiles, projects, research, facilities, and solutions.
+          </p>
+        </div>
+      }
+      className="py-20"
+    />
   );
 }

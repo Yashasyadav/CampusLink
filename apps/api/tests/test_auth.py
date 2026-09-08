@@ -1,12 +1,38 @@
 import pytest
 import uuid
+from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 from app.main import app
-from app.db.session import AsyncSessionLocal
+from app.db.session import AsyncSessionLocal, sync_engine
 from app.models.users import User, UserRole, UserStatus
+from app.models.captcha import Captcha, CaptchaChallenge, CaptchaRotationState
 from app.core.security import verify_password
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 client = TestClient(app)
+
+
+def captcha_answer(challenge_token: str) -> str:
+    with Session(sync_engine) as db:
+        challenge = db.execute(
+            select(CaptchaChallenge)
+            .where(CaptchaChallenge.challenge_token == challenge_token)
+        ).scalar_one()
+        captcha = db.get(Captcha, challenge.captcha_id)
+        return captcha.captcha_text
+
+
+def captcha_login_payload(email: str, password: str, captcha_value: str | None = None) -> dict:
+    response = client.get("/api/v1/auth/captcha")
+    assert response.status_code == 200
+    captcha = response.json()["captcha"]
+    return {
+        "email": email,
+        "password": password,
+        "captchaToken": captcha["challengeToken"],
+        "captchaValue": captcha_value or captcha_answer(captcha["challengeToken"]),
+    }
 
 
 def test_registration_success():
@@ -82,7 +108,7 @@ def test_login_success_and_logout():
     # Test Login
     login_resp = client.post(
         "/api/v1/auth/login",
-        json={"email": email, "password": password},
+        json=captcha_login_payload(email, password),
     )
     assert login_resp.status_code == 200
     assert login_resp.json()["user"]["email"] == email.lower()
@@ -114,10 +140,128 @@ def test_login_invalid_password_fails():
 
     login_resp = client.post(
         "/api/v1/auth/login",
-        json={"email": email, "password": "WrongPassword123!"},
+        json=captcha_login_payload(email, "WrongPassword123!"),
     )
     assert login_resp.status_code == 401
-    assert login_resp.json()["detail"] == "Invalid email or password."
+    assert login_resp.json()["message"] == "Invalid email or password."
+    assert login_resp.json()["error"] == "authentication_failed"
+    assert "nextCaptcha" in login_resp.json()
+
+
+def test_captcha_fetch_returns_one_time_challenge():
+    response = client.get("/api/v1/auth/captcha")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert data["captcha"]["challengeToken"]
+    assert data["captcha"]["image"].startswith("data:image/svg+xml;base64,")
+
+
+def test_captcha_rotates_and_wraps():
+    with Session(sync_engine) as db:
+        state = db.get(CaptchaRotationState, 1)
+        if not state:
+            state = CaptchaRotationState(id=1, current_index=0, updated_at=datetime.now(timezone.utc))
+            db.add(state)
+        state.current_index = 8
+        db.commit()
+
+    captcha_9 = client.get("/api/v1/auth/captcha").json()["captcha"]
+    captcha_10 = client.get("/api/v1/auth/captcha").json()["captcha"]
+    captcha_1 = client.get("/api/v1/auth/captcha").json()["captcha"]
+
+    assert captcha_answer(captcha_9["challengeToken"]) == "P6A4Z"
+    assert captcha_answer(captcha_10["challengeToken"]) == "R7M2Q"
+    assert captcha_answer(captcha_1["challengeToken"]) == "K7P4X"
+
+
+def test_wrong_captcha_blocks_login_and_returns_next_captcha():
+    email = f"captcha.wrong.{uuid.uuid4().hex[:8]}@campuslink.edu"
+    password = "CorrectPassword123!"
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": email, "password": password, "role": "STUDENT"},
+    )
+
+    login_resp = client.post(
+        "/api/v1/auth/login",
+        json=captcha_login_payload(email, password, captcha_value="WRONG"),
+    )
+    assert login_resp.status_code == 400
+    data = login_resp.json()
+    assert data["error"] == "captcha_invalid"
+    assert data["message"] == "Incorrect CAPTCHA. Please try again."
+    assert "nextCaptcha" in data
+
+
+def test_used_captcha_cannot_be_reused():
+    email = f"captcha.reuse.{uuid.uuid4().hex[:8]}@campuslink.edu"
+    password = "CorrectPassword123!"
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": email, "password": password, "role": "STUDENT"},
+    )
+    payload = captcha_login_payload(email, password)
+
+    first = client.post("/api/v1/auth/login", json=payload)
+    second = client.post("/api/v1/auth/login", json=payload)
+
+    assert first.status_code == 200
+    assert second.status_code == 400
+    assert second.json()["error"] == "captcha_invalid"
+
+
+def test_failed_login_consumes_captcha():
+    email = f"captcha.consume.{uuid.uuid4().hex[:8]}@campuslink.edu"
+    password = "CorrectPassword123!"
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": email, "password": password, "role": "STUDENT"},
+    )
+    payload = captcha_login_payload(email, "WrongPassword123!")
+
+    first = client.post("/api/v1/auth/login", json=payload)
+    second = client.post("/api/v1/auth/login", json=payload)
+
+    assert first.status_code == 401
+    assert second.status_code == 400
+    assert second.json()["error"] == "captcha_invalid"
+
+
+def test_refresh_consumes_previous_captcha_and_returns_next():
+    captcha = client.get("/api/v1/auth/captcha").json()["captcha"]
+    refreshed = client.post(
+        "/api/v1/auth/captcha/refresh",
+        json={"captchaToken": captcha["challengeToken"]},
+    )
+
+    assert refreshed.status_code == 200
+    assert refreshed.json()["captcha"]["challengeToken"] != captcha["challengeToken"]
+
+    with Session(sync_engine) as db:
+        challenge = db.execute(
+            select(CaptchaChallenge).where(
+                CaptchaChallenge.challenge_token == captcha["challengeToken"]
+            )
+        ).scalar_one()
+        assert challenge.used_at is not None
+
+
+def test_missing_captcha_fields_rejected():
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"email": "missing.captcha@campuslink.edu", "password": "Password123!"},
+    )
+    assert response.status_code == 422
+
+
+def test_exactly_10_active_master_captchas_exist():
+    client.get("/api/v1/auth/captcha")
+    with Session(sync_engine) as db:
+        active_count = db.execute(
+            select(Captcha).where(Captcha.is_active.is_(True))
+        ).scalars().all()
+        assert len(active_count) == 10
 
 
 def test_profile_view_and_update():

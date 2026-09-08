@@ -4,6 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
 from app.models.users import User
+from starlette.concurrency import run_in_threadpool
+from app.db.session import SyncSessionLocal
 from app.schemas.matching import MatchingAnalyzeRequest, MatchingAnalyzeResponse
 from app.agents.matching_agent import MatchingAgent
 
@@ -39,16 +41,19 @@ async def analyze_matching(
             detail="Query string cannot be empty.",
         )
 
-    try:
-        def _do_matching(sync_db):
-            return matching_agent.evaluate(
-                db=sync_db,
-                current_user=current_user,
-                query=body.query,
-                precomputed_discovery=body.discovery,
-            )
 
-        response = await db.run_sync(_do_matching)
+    try:
+        def _execute_blocking_matching():
+            # Run in a dedicated sync session within the thread to avoid sharing async db connection
+            with SyncSessionLocal() as sync_db:
+                return matching_agent.evaluate(
+                    db=sync_db,
+                    current_user=current_user,
+                    query=body.query,
+                    precomputed_discovery=body.discovery,
+                )
+
+        response = await run_in_threadpool(_execute_blocking_matching)
         return response
 
     except Exception as exc:

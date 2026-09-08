@@ -1,14 +1,77 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  App,
+  Avatar,
+  Button,
+  Card,
+  Col,
+  Descriptions,
+  Empty,
+  Form,
+  Input,
+  Modal,
+  Row,
+  Segmented,
+  Select,
+  Space,
+  Statistic,
+  Tag,
+  Typography,
+} from "antd";
+import {
+  BookOutlined,
+  CalendarOutlined,
+  FileSearchOutlined,
+  LinkOutlined,
+  PlusOutlined,
+  ReadOutlined,
+  SearchOutlined,
+  TeamOutlined,
+} from "@ant-design/icons";
 import { AppShell } from "@/components/layout/app-shell";
 import { ProtectedRoute } from "@/components/layout/protected-route";
-import { ResearchItem } from "@/types";
-import { knowledgeService } from "@/services/knowledge";
-import { ApiError } from "@/lib/api-client";
-import { BookOpen, Plus, Search, ExternalLink, UserCheck, X, CalendarDays } from "lucide-react";
+import { ErrorState } from "@/components/ui/error-state";
 import { CardGridSkeleton, ResearchCardSkeleton } from "@/components/ui/skeletons";
-import { ErrorState, EmptyState } from "@/components/ui/error-state";
+import { ApiError } from "@/lib/api-client";
+import { knowledgeService } from "@/services/knowledge";
+import { ResearchItem } from "@/types";
+
+const { Paragraph, Text, Title } = Typography;
+
+type ResearchStatusFilter = "ALL" | ResearchItem["status"];
+
+type ResearchFormValues = {
+  title: string;
+  abstract?: string;
+  research_area?: string;
+  publication_type: ResearchItem["publication_type"];
+  publication_venue?: string;
+  doi?: string;
+  publication_url?: string;
+  status: ResearchItem["status"];
+  visibility: ResearchItem["visibility"];
+};
+
+const defaultResearchValues: ResearchFormValues = {
+  title: "",
+  abstract: "",
+  research_area: "",
+  publication_type: "JOURNAL",
+  publication_venue: "",
+  doi: "",
+  publication_url: "",
+  status: "PUBLISHED",
+  visibility: "PUBLIC",
+};
+
+const statusOptions: { label: string; value: ResearchStatusFilter }[] = [
+  { label: "All", value: "ALL" },
+  { label: "Published", value: "PUBLISHED" },
+  { label: "Submitted", value: "SUBMITTED" },
+  { label: "Draft", value: "DRAFT" },
+];
 
 export default function ResearchPage() {
   return (
@@ -21,18 +84,18 @@ export default function ResearchPage() {
 }
 
 function ResearchContent() {
+  const { message } = App.useApp();
+  const [form] = Form.useForm<ResearchFormValues>();
   const [researchList, setResearchList] = useState<ResearchItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorStatus, setErrorStatus] = useState<number | undefined>();
   const [searchQuery, setSearchQuery] = useState("");
   const [areaFilter, setAreaFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<ResearchStatusFilter>("ALL");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    title: "", abstract: "", research_area: "",
-    publication_type: "JOURNAL", publication_venue: "", doi: "",
-    publication_url: "", status: "PUBLISHED", visibility: "PUBLIC",
-  });
+  const [selectedResearch, setSelectedResearch] = useState<ResearchItem | null>(null);
 
   const fetchResearch = async () => {
     try {
@@ -42,234 +105,401 @@ function ResearchContent() {
       setResearchList(data.items);
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed to load research publications.";
-      const status = err instanceof ApiError ? err.status : undefined;
       setError(msg);
-      setErrorStatus(status);
+      setErrorStatus(err instanceof ApiError ? err.status : undefined);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchResearch(); }, [areaFilter]);
+  useEffect(() => {
+    fetchResearch();
+  }, [areaFilter]);
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const researchAreas = useMemo(() => {
+    const values = researchList
+      .map((item) => item.research_area)
+      .filter((area): area is string => Boolean(area));
+    return Array.from(new Set(values)).sort();
+  }, [researchList]);
+
+  const filtered = useMemo(() => {
+    const needle = searchQuery.trim().toLowerCase();
+    return researchList.filter((item) => {
+      const matchesStatus = statusFilter === "ALL" || item.status === statusFilter;
+      const matchesSearch =
+        !needle ||
+        [item.title, item.abstract, item.research_area, item.publication_venue, item.doi]
+          .filter(Boolean)
+          .some((value) => value!.toLowerCase().includes(needle));
+      return matchesStatus && matchesSearch;
+    });
+  }, [researchList, searchQuery, statusFilter]);
+
+  const stats = useMemo(
+    () => ({
+      total: researchList.length,
+      published: researchList.filter((item) => item.status === "PUBLISHED").length,
+      submitted: researchList.filter((item) => item.status === "SUBMITTED").length,
+      authors: researchList.reduce((sum, item) => sum + item.authors.length, 0),
+    }),
+    [researchList],
+  );
+
+  const handleCreate = async (values: ResearchFormValues) => {
     try {
+      setCreating(true);
       await knowledgeService.createResearch({
-        title: formData.title,
-        abstract: formData.abstract,
-        research_area: formData.research_area,
-        publication_type: formData.publication_type as ResearchItem["publication_type"],
-        publication_venue: formData.publication_venue,
-        doi: formData.doi || undefined,
-        publication_url: formData.publication_url || undefined,
-        status: formData.status as ResearchItem["status"],
-        visibility: formData.visibility as ResearchItem["visibility"],
+        title: values.title,
+        abstract: values.abstract,
+        research_area: values.research_area,
+        publication_type: values.publication_type,
+        publication_venue: values.publication_venue,
+        doi: values.doi || undefined,
+        publication_url: values.publication_url || undefined,
+        status: values.status,
+        visibility: values.visibility,
       });
       setIsModalOpen(false);
+      form.resetFields();
+      message.success("Publication added");
       fetchResearch();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Failed to create research.";
-      alert(msg);
+      message.error(err instanceof ApiError ? err.message : "Failed to create research.");
+    } finally {
+      setCreating(false);
     }
   };
 
-  const filtered = researchList.filter((r) =>
-    (r.title || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (r.abstract || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (r.research_area || "").toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   return (
-    <div className="max-w-page mx-auto px-6 md:px-10 py-8 space-y-8 animate-fade-in">
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5 border-b border-slate-200 pb-7">
+    <div className="mx-auto max-w-page px-6 py-8 md:px-10">
+      <div className="mb-7 flex flex-col gap-5 border-b border-slate-200 pb-7 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-4">
-          <div className="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
-            <BookOpen className="w-5 h-5 text-emerald-600" />
-          </div>
+          <span className="page-heading-icon research-heading-icon">
+            <BookOutlined />
+          </span>
           <div>
-            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Research & Publications</h1>
-            <p className="text-slate-500 text-sm mt-0.5">
-              {loading ? "Loading…" : `${researchList.length} publication${researchList.length !== 1 ? "s" : ""} in repository`}
-            </p>
+            <Title level={2} className="!m-0 !text-2xl">
+              Research & Publications
+            </Title>
+            <Text type="secondary">
+              {loading ? "Loading..." : `${researchList.length} publication${researchList.length !== 1 ? "s" : ""} in repository`}
+            </Text>
           </div>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[13px] rounded-xl transition shadow-blue shrink-0"
-        >
-          <Plus className="w-4 h-4" /> Add Publication
-        </button>
+        <Button type="primary" size="large" icon={<PlusOutlined />} onClick={() => setIsModalOpen(true)}>
+          Add Publication
+        </Button>
       </div>
 
-      {/* FILTERS */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input type="text" placeholder="Search by title, abstract, or research area…"
-            value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 text-[13px] transition" />
-        </div>
-        <select value={areaFilter} onChange={(e) => setAreaFilter(e.target.value)}
-          className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-700 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition">
-          <option value="">All Research Areas</option>
-          <option value="AI/ML">AI & Machine Learning</option>
-          <option value="Security">Cybersecurity</option>
-          <option value="IoT">IoT & Embedded Systems</option>
-          <option value="Quantum">Quantum Computing</option>
-          <option value="Robotics">Robotics</option>
-        </select>
+      <Row gutter={[16, 16]} className="mb-6">
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic title="Total Publications" value={stats.total} prefix={<FileSearchOutlined />} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic title="Published" value={stats.published} prefix={<ReadOutlined />} valueStyle={{ color: "#16a34a" }} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic title="Submitted" value={stats.submitted} prefix={<CalendarOutlined />} valueStyle={{ color: "#2563eb" }} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic title="Authors" value={stats.authors} prefix={<TeamOutlined />} />
+          </Card>
+        </Col>
+      </Row>
+
+      <div className="mb-8 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_280px_auto]">
+        <Input
+          size="large"
+          allowClear
+          prefix={<SearchOutlined />}
+          placeholder="Search by title, abstract, author signal, venue, DOI, or research area..."
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+        />
+        <Select
+          size="large"
+          value={areaFilter}
+          onChange={setAreaFilter}
+          options={[
+            { value: "", label: "All Research Areas" },
+            ...researchAreas.map((area) => ({ value: area, label: area })),
+            { value: "AI/ML", label: "AI & Machine Learning" },
+            { value: "Security", label: "Cybersecurity" },
+            { value: "IoT", label: "IoT & Embedded Systems" },
+            { value: "Quantum", label: "Quantum Computing" },
+            { value: "Robotics", label: "Robotics" },
+          ]}
+        />
+        <Segmented
+          size="large"
+          value={statusFilter}
+          onChange={(value) => setStatusFilter(value as ResearchStatusFilter)}
+          options={statusOptions}
+        />
       </div>
 
-      {/* CONTENT */}
       {loading ? (
         <CardGridSkeleton count={6} Skeleton={ResearchCardSkeleton} />
       ) : error ? (
         <ErrorState status={errorStatus} message={error} onRetry={fetchResearch} />
       ) : filtered.length === 0 ? (
-        <EmptyState icon={BookOpen} title={searchQuery ? `No publications for "${searchQuery}"` : "No publications yet"}
-          description="Be the first to add a research paper to the campus repository."
-          action={{ label: "Add Publication", onClick: () => setIsModalOpen(true) }} />
+        <Card>
+          <Empty description={searchQuery ? `No publications for "${searchQuery}"` : "No publications found"}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsModalOpen(true)}>
+              Add Publication
+            </Button>
+          </Empty>
+        </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map((r) => <ResearchCard key={r.id} item={r} />)}
-        </div>
+        <Row gutter={[24, 24]}>
+          {filtered.map((item) => (
+            <Col key={item.id} xs={24} md={12} xl={8}>
+              <ResearchCard item={item} onView={() => setSelectedResearch(item)} />
+            </Col>
+          ))}
+        </Row>
       )}
 
-      {/* CREATE MODAL */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 md:p-8 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-5">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">Add Research Publication</h2>
-                <p className="text-[12px] text-slate-500 mt-0.5">Contribute to the campus knowledge repository</p>
-              </div>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 rounded-xl text-slate-400 hover:bg-slate-100 transition">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={handleCreate} className="space-y-4">
-              <Field label="Publication Title" required>
-                <input required type="text" placeholder="Enter full publication title"
-                  value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className={inputCls} />
-              </Field>
-              <Field label="Abstract">
-                <textarea rows={4} placeholder="Research abstract or summary…"
-                  value={formData.abstract} onChange={(e) => setFormData({ ...formData, abstract: e.target.value })}
-                  className={inputCls} />
-              </Field>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Field label="Research Area">
-                  <input type="text" placeholder="e.g. AI & Machine Learning"
-                    value={formData.research_area} onChange={(e) => setFormData({ ...formData, research_area: e.target.value })}
-                    className={inputCls} />
-                </Field>
-                <Field label="Publication Type">
-                  <select value={formData.publication_type} onChange={(e) => setFormData({ ...formData, publication_type: e.target.value })} className={inputCls}>
-                    <option value="JOURNAL">Journal Article</option>
-                    <option value="CONFERENCE">Conference Paper</option>
-                    <option value="WORKSHOP">Workshop</option>
-                    <option value="THESIS">Thesis / Dissertation</option>
-                    <option value="PREPRINT">Preprint</option>
-                    <option value="TECHNICAL_REPORT">Technical Report</option>
-                  </select>
-                </Field>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Field label="Publication Venue">
-                  <input type="text" placeholder="e.g. IEEE TPAMI"
-                    value={formData.publication_venue} onChange={(e) => setFormData({ ...formData, publication_venue: e.target.value })}
-                    className={inputCls} />
-                </Field>
-                <Field label="DOI">
-                  <input type="text" placeholder="10.1109/..."
-                    value={formData.doi} onChange={(e) => setFormData({ ...formData, doi: e.target.value })}
-                    className={inputCls} />
-                </Field>
-              </div>
-              <Field label="Publication URL">
-                <input type="url" placeholder="https://..."
-                  value={formData.publication_url} onChange={(e) => setFormData({ ...formData, publication_url: e.target.value })}
-                  className={inputCls} />
-              </Field>
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-[13px] transition">Cancel</button>
-                <button type="submit" className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-[13px] shadow-blue transition">Add Publication</button>
-              </div>
-            </form>
+      <Modal
+        open={isModalOpen}
+        onCancel={() => setIsModalOpen(false)}
+        title="Add Research Publication"
+        footer={null}
+        width={760}
+        destroyOnClose
+      >
+        <Form<ResearchFormValues>
+          form={form}
+          layout="vertical"
+          requiredMark={false}
+          initialValues={defaultResearchValues}
+          onFinish={handleCreate}
+          className="pt-2"
+        >
+          <Form.Item name="title" label="Publication Title" rules={[{ required: true, message: "Enter publication title" }]}>
+            <Input placeholder="Enter full publication title" />
+          </Form.Item>
+
+          <Form.Item name="abstract" label="Abstract">
+            <Input.TextArea rows={4} placeholder="Research abstract or summary..." />
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
+              <Form.Item name="research_area" label="Research Area">
+                <Input placeholder="AI & Machine Learning" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="publication_type" label="Publication Type">
+                <Select options={[
+                  { value: "JOURNAL", label: "Journal Article" },
+                  { value: "JOURNAL_ARTICLE", label: "Journal Article" },
+                  { value: "CONFERENCE", label: "Conference Paper" },
+                  { value: "WORKSHOP", label: "Workshop" },
+                  { value: "THESIS", label: "Thesis" },
+                  { value: "DISSERTATION", label: "Dissertation" },
+                  { value: "PREPRINT", label: "Preprint" },
+                  { value: "TECHNICAL_REPORT", label: "Technical Report" },
+                  { value: "OTHER", label: "Other" },
+                ]} />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
+              <Form.Item name="publication_venue" label="Publication Venue">
+                <Input placeholder="IEEE TPAMI" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="doi" label="DOI">
+                <Input placeholder="10.1109/..." />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item name="publication_url" label="Publication URL">
+            <Input type="url" placeholder="https://..." />
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
+              <Form.Item name="status" label="Status">
+                <Select options={[
+                  { value: "DRAFT", label: "Draft" },
+                  { value: "SUBMITTED", label: "Submitted" },
+                  { value: "PUBLISHED", label: "Published" },
+                ]} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="visibility" label="Visibility">
+                <Select options={[
+                  { value: "PUBLIC", label: "Public" },
+                  { value: "CAMPUS_ONLY", label: "Campus Only" },
+                  { value: "PRIVATE", label: "Private" },
+                ]} />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+            <Button onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button htmlType="submit" type="primary" loading={creating}>
+              Add Publication
+            </Button>
           </div>
-        </div>
-      )}
+        </Form>
+      </Modal>
+
+      <Modal
+        open={!!selectedResearch}
+        onCancel={() => setSelectedResearch(null)}
+        title={selectedResearch?.title}
+        footer={null}
+        width={820}
+      >
+        {selectedResearch && <ResearchDetails item={selectedResearch} />}
+      </Modal>
     </div>
   );
 }
 
-function ResearchCard({ item }: { item: ResearchItem }) {
-  const pubTypeColors: Record<string, string> = {
-    JOURNAL: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    CONFERENCE: "bg-blue-50 text-blue-700 border-blue-200",
-    WORKSHOP: "bg-indigo-50 text-indigo-700 border-indigo-200",
-    THESIS: "bg-purple-50 text-purple-700 border-purple-200",
-    PREPRINT: "bg-amber-50 text-amber-700 border-amber-200",
-    TECHNICAL_REPORT: "bg-slate-100 text-slate-700 border-slate-200",
-  };
-  const typeClass = pubTypeColors[item.publication_type] || "bg-slate-100 text-slate-700 border-slate-200";
+function ResearchCard({ item, onView }: { item: ResearchItem; onView: () => void }) {
+  const url = item.publication_url || item.paper_url;
 
   return (
-    <div className="group bg-white border border-slate-200 hover:border-slate-300 rounded-2xl p-6 transition-all card-interactive shadow-card flex flex-col justify-between">
+    <Card hoverable className="h-full research-card" styles={{ body: { height: "100%", padding: 28 } }}>
+      <div className="research-card-body">
+        <Space wrap size={[8, 8]} className="research-card-tags">
+          <Tag color={publicationColor(item.publication_type)}>
+            {item.publication_type.replace(/_/g, " ")}
+          </Tag>
+          <Tag color={statusColor(item.status)}>{item.status}</Tag>
+          {item.research_area && <Tag>{item.research_area}</Tag>}
+        </Space>
+
+        <div className="research-card-main">
+          <Title level={5} className="!mb-2">
+            {item.title}
+          </Title>
+          {item.abstract && (
+            <Paragraph type="secondary" ellipsis={{ rows: 3 }} className="!mb-0">
+              {item.abstract}
+            </Paragraph>
+          )}
+        </div>
+
+        <div className="research-card-meta">
+          <div className="research-card-venue">
+            {item.publication_venue ? (
+              <Text italic type="secondary">
+                {item.publication_venue}
+              </Text>
+            ) : (
+              <Text type="secondary">Venue not set</Text>
+            )}
+          </div>
+          <div className="flex min-h-7 items-center justify-between">
+            <Text type="secondary">
+              <CalendarOutlined /> {item.publication_date ? new Date(item.publication_date).getFullYear() : "Year not set"}
+            </Text>
+            {item.doi && <Tag>DOI</Tag>}
+          </div>
+        </div>
+
+        <div className="research-card-footer">
+          <Text type="secondary">
+            <TeamOutlined /> {item.authors.length}
+          </Text>
+          <Button type="link" onClick={onView} className="p-0 font-bold">
+            View Details
+          </Button>
+          {url ? (
+            <Button type="link" href={url} target="_blank" className="p-0 font-bold">
+              Open <LinkOutlined />
+            </Button>
+          ) : (
+            <Text type="secondary">No link</Text>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function ResearchDetails({ item }: { item: ResearchItem }) {
+  const url = item.publication_url || item.paper_url;
+
+  return (
+    <Space direction="vertical" size="large" className="w-full">
+      <Space wrap>
+        <Tag color={publicationColor(item.publication_type)}>{item.publication_type.replace(/_/g, " ")}</Tag>
+        <Tag color={statusColor(item.status)}>{item.status}</Tag>
+        <Tag>{item.visibility.replace(/_/g, " ")}</Tag>
+        {item.research_area && <Tag color="blue">{item.research_area}</Tag>}
+      </Space>
+
+      {item.abstract ? <Paragraph className="!mb-0">{item.abstract}</Paragraph> : <Text type="secondary">No abstract provided.</Text>}
+
+      <Descriptions bordered size="small" column={1}>
+        {item.publication_venue && <Descriptions.Item label="Venue">{item.publication_venue}</Descriptions.Item>}
+        {item.publication_date && <Descriptions.Item label="Publication Date">{new Date(item.publication_date).toLocaleDateString()}</Descriptions.Item>}
+        {item.doi && <Descriptions.Item label="DOI">{item.doi}</Descriptions.Item>}
+        {url && (
+          <Descriptions.Item label="Publication Link">
+            <Button type="link" href={url} target="_blank" className="p-0">
+              Open publication <LinkOutlined />
+            </Button>
+          </Descriptions.Item>
+        )}
+      </Descriptions>
+
       <div>
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <span className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border uppercase ${typeClass}`}>
-            {item.publication_type.replace("_", " ")}
-          </span>
-          {item.research_area && (
-            <span className="text-[11px] text-slate-500 font-medium truncate max-w-[120px]">{item.research_area}</span>
+        <Text strong>Authors</Text>
+        <div className="mt-3 space-y-2">
+          {item.authors.length === 0 ? (
+            <Text type="secondary">No authors listed.</Text>
+          ) : (
+            item.authors.map((author) => (
+              <div key={author.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                <Space>
+                  <Avatar>{(author.full_name || author.email || "A").slice(0, 2).toUpperCase()}</Avatar>
+                  <div>
+                    <Text strong>{author.full_name || author.email || "Research Author"}</Text>
+                    <div><Text type="secondary">Author #{author.author_order}</Text></div>
+                  </div>
+                </Space>
+              </div>
+            ))
           )}
         </div>
-        <h3 className="text-[15px] font-bold text-slate-900 group-hover:text-blue-600 transition mb-2 leading-snug line-clamp-2">{item.title}</h3>
-        {item.abstract && <p className="text-slate-500 text-[13px] line-clamp-3 mb-4 leading-relaxed">{item.abstract}</p>}
-        {item.publication_venue && (
-          <p className="text-[12px] text-slate-500 italic mb-3">{item.publication_venue}</p>
-        )}
-        {item.authors.length > 0 && (
-          <div className="flex items-center gap-1.5 text-[12px] text-slate-500 mb-2">
-            <UserCheck className="w-3.5 h-3.5 text-slate-400" />
-            <span>{item.authors.map((a) => a.full_name || "Unknown").join(", ")}</span>
-          </div>
-        )}
       </div>
-      <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-[12px] text-slate-500">
-        <div className="flex items-center gap-1.5">
-          {item.publication_date && (
-            <>
-              <CalendarDays className="w-3.5 h-3.5 text-slate-400" />
-              <span>{new Date(item.publication_date).getFullYear()}</span>
-            </>
-          )}
-        </div>
-        {item.publication_url ? (
-          <a href={item.publication_url} target="_blank" rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 font-bold transition">
-            Read Paper <ExternalLink className="w-3 h-3" />
-          </a>
-        ) : (
-          <span className="text-slate-400">{item.status}</span>
-        )}
-      </div>
-    </div>
+    </Space>
   );
 }
 
-const inputCls = "w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition";
+function publicationColor(type: ResearchItem["publication_type"]) {
+  if (type === "CONFERENCE") return "blue";
+  if (type === "WORKSHOP") return "purple";
+  if (type === "THESIS" || type === "DISSERTATION") return "geekblue";
+  if (type === "PREPRINT") return "gold";
+  if (type === "TECHNICAL_REPORT") return "default";
+  return "green";
+}
 
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-widest mb-1.5">{label}{required && " *"}</label>
-      {children}
-    </div>
-  );
+function statusColor(status: ResearchItem["status"]) {
+  if (status === "PUBLISHED") return "green";
+  if (status === "SUBMITTED") return "blue";
+  return "default";
 }
