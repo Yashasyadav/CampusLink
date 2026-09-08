@@ -1,5 +1,5 @@
-from typing import List, Optional
-from pydantic import Field
+from typing import Any, List, Optional
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +18,17 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = Field(default="INFO", description="Logging level")
     DEBUG: bool = Field(default=True, description="Debug flag")
 
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def normalize_debug_flag(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"release", "production", "prod"}:
+                return False
+            if normalized in {"development", "dev"}:
+                return True
+        return value
+
     # API Settings
     PROJECT_NAME: str = "CampusLink AI"
     API_V1_STR: str = "/api/v1"
@@ -35,7 +46,7 @@ class Settings(BaseSettings):
     # AI & LLM Provider
     LLM_PROVIDER: str = Field(default="gemini")
     GEMINI_API_KEY: Optional[str] = Field(default=None)
-    GEMINI_MODEL: str = Field(default="gemini-3.6-flash")
+    GEMINI_MODEL: str = Field(default="gemini-3.8-flash")
 
     # Embeddings
     EMBEDDING_PROVIDER: str = Field(default="gemini")

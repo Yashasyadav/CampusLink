@@ -106,25 +106,39 @@ class GeminiDocumentAIProvider(DocumentAIProvider):
         else:
             raise ValueError(f"Unsupported document mime type: {mime_type}")
 
-        try:
-            response = client.models.generate_content(
-                model=self.model_name,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=ResumeExtraction,
-                    temperature=0.1,
-                ),
-            )
+        candidate_models = list(dict.fromkeys([self.model_name, "gemini-3.5-flash"]))
+        last_error: Optional[Exception] = None
 
-            if not response.text:
-                raise ValueError("Gemini returned empty response text")
+        for model_name in candidate_models:
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=ResumeExtraction,
+                        temperature=0.1,
+                    ),
+                )
 
-            return ResumeExtraction.model_validate_json(response.text)
+                if not response.text:
+                    raise ValueError("Gemini returned empty response text")
 
-        except Exception as e:
-            logger.error(
-                f"Gemini document extraction failed for model={self.model_name}", exc_info=True
-            )
-            # Safe user error message without revealing internal keys or traces
-            raise RuntimeError("Resume analysis service failed. Please try again.") from e
+                self.model_name = model_name
+                return ResumeExtraction.model_validate_json(response.text)
+            except Exception as exc:
+                last_error = exc
+                status_code = getattr(exc, "code", None)
+                if status_code not in {429, 503} or model_name == candidate_models[-1]:
+                    break
+                logger.warning(
+                    "Gemini resume extraction unavailable for model=%s; retrying fallback model",
+                    model_name,
+                )
+
+        logger.error(
+            "Gemini document extraction failed for models=%s",
+            candidate_models,
+            exc_info=last_error,
+        )
+        raise RuntimeError("Resume analysis service failed. Please try again.") from last_error

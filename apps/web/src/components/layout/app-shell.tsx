@@ -113,7 +113,7 @@ export function AppShell({ children }: AppShellProps) {
           <Drawer
             className="campus-sidebar-drawer md:hidden"
             placement="left"
-            width={272}
+            size={272}
             open={mobileOpen}
             onClose={() => setMobileOpen(false)}
             closeIcon={null}
