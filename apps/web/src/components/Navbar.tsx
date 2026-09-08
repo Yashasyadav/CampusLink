@@ -260,20 +260,29 @@ export default function AppNavbar({
             menu={{ items: userMenuItems }}
             placement="bottomRight"
             trigger={["click"]}
-            overlayClassName="campus-user-dropdown-overlay"
+            classNames={{ root: "campus-user-dropdown-overlay" }}
           >
             <button
               type="button"
-              className="campus-profile-chip"
+              className="campus-profile-chip inline-flex h-10 min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white py-1 pl-1 pr-3 shadow-sm transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
               aria-label="User menu"
             >
-              <Avatar size={28} className="campus-profile-avatar">
+              <Avatar
+                size={30}
+                className="campus-profile-avatar shrink-0"
+                style={{
+                  background: "linear-gradient(135deg, #4f46e5 0%, #2563eb 100%)",
+                  color: "#ffffff",
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
                 {initials}
               </Avatar>
-              <span className="campus-profile-name hidden sm:inline-block">
+              <span className="campus-profile-name hidden max-w-[120px] min-w-0 truncate text-[13px] font-semibold text-slate-700 sm:inline-block">
                 {displayName}
               </span>
-              <DownOutlined style={{ fontSize: 9, color: "#8c8c8c" }} />
+              <DownOutlined className="shrink-0 text-[9px] text-slate-400" />
             </button>
           </Dropdown>
         ) : (

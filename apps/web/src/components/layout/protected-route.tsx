@@ -3,6 +3,7 @@
 import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
+import { SessionSplash } from "@/components/ui/session-splash";
 
 export function ProtectedRoute({ children, requireAdmin = false }: { children: React.ReactNode; requireAdmin?: boolean }) {
   const { user, loading } = useAuth();
@@ -18,13 +19,9 @@ export function ProtectedRoute({ children, requireAdmin = false }: { children: R
     }
   }, [loading, user, requireAdmin, router]);
 
-  // Only render full-screen loading spinner when initial auth state is unknown AND user is null
+  // Render branded splash screen while initial auth state is resolving
   if (loading && !user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50 text-slate-400">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
+    return <SessionSplash message="Verifying campus credentials…" />;
   }
 
   if (!user || (requireAdmin && user.role !== "ADMIN")) {

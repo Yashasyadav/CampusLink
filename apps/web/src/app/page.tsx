@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2 } from "lucide-react";
+import { SessionSplash } from "@/components/ui/session-splash";
 
 export default function RootPage() {
   const { user, loading } = useAuth();
@@ -21,12 +21,5 @@ export default function RootPage() {
     }
   }, [user, loading, router]);
 
-  return (
-    <main className="flex items-center justify-center min-h-screen bg-slate-50 text-slate-500">
-      <div className="flex items-center gap-3 text-sm font-medium">
-        <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-        <span>Resolving CampusLink session...</span>
-      </div>
-    </main>
-  );
+  return <SessionSplash message="Resolving CampusLink session…" />;
 }
