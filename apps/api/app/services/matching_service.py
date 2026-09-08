@@ -230,19 +230,20 @@ class MatchingService:
                 contributors = proj.get("contributors") or proj_meta.get("contributors", [])
                 score_raw = float(proj.get("score") or proj.get("relevance") or 0.50)
 
-                score, relevance_level, ev_strength, _ = self.scoring_service.calculate_score(
-                    semantic_relevance=score_raw,
-                    query_skills=q_skills,
-                    candidate_skills=skills,
-                    query_technologies=q_tech,
-                    candidate_technologies=technologies,
-                    has_project_evidence=True,
-                    has_solution_evidence=False,
-                    best_evidence_type="PROJECT",
-                )
-
-                if score < MIN_RELEVANCE_THRESHOLD:
-                    continue
+                # For projects, relevance reflects direct retrieval score + technology/skill match
+                tech_match = any(t.lower() in [qt.lower() for qt in q_tech] for t in technologies) if technologies and q_tech else False
+                skill_match = any(s.lower() in [qs.lower() for qs in q_skills] for s in skills) if skills and q_skills else False
+                boost = 0.15 if tech_match else (0.10 if skill_match else 0.0)
+                score = round(min(1.0, max(0.35, score_raw + boost)), 4)
+                if score >= 0.70:
+                    relevance_level = "VERY_HIGH"
+                elif score >= 0.50:
+                    relevance_level = "HIGH"
+                elif score >= 0.35:
+                    relevance_level = "MEDIUM"
+                else:
+                    relevance_level = "LOW"
+                ev_strength = "STRONG" if tech_match or score >= 0.50 else "MODERATE"
 
                 matching_ev = [e for e in discovery.evidence if str(e.entity_id) == proj_id]
                 formatted_ev = self.evidence_service.format_evidence_items(
@@ -285,6 +286,7 @@ class MatchingService:
                         help_type=help_type,
                         strengths=proj_strengths,
                         limitations=limitations,
+                        metadata={"contributors": contributors, "technologies": technologies},
                     )
                 )
 
@@ -298,19 +300,17 @@ class MatchingService:
                 title = sol.get("title") or sol.get("problem_title") or "Campus Solution Record"
                 score_raw = float(sol.get("score") or sol.get("relevance") or 0.50)
 
-                score, relevance_level, ev_strength, _ = self.scoring_service.calculate_score(
-                    semantic_relevance=score_raw,
-                    query_skills=q_skills,
-                    candidate_skills=[],
-                    query_technologies=q_tech,
-                    candidate_technologies=[],
-                    has_project_evidence=False,
-                    has_solution_evidence=True,
-                    best_evidence_type="PROBLEM_SOLUTION",
-                )
-
-                if score < MIN_RELEVANCE_THRESHOLD:
-                    continue
+                # For previous solution records, relevance directly reflects retrieval match quality
+                score = round(min(1.0, max(0.35, score_raw)), 4)
+                if score >= 0.70:
+                    relevance_level = "VERY_HIGH"
+                elif score >= 0.50:
+                    relevance_level = "HIGH"
+                elif score >= 0.35:
+                    relevance_level = "MEDIUM"
+                else:
+                    relevance_level = "LOW"
+                ev_strength = "STRONG" if score >= 0.50 else "MODERATE"
 
                 matching_ev = [e for e in discovery.evidence if str(e.entity_id) == sol_id]
                 formatted_ev = self.evidence_service.format_evidence_items(
@@ -363,19 +363,17 @@ class MatchingService:
                 authors = res_meta.get("authors", [])
                 score_raw = float(item.get("score") or item.get("relevance") or 0.50)
 
-                score, relevance_level, ev_strength, _ = self.scoring_service.calculate_score(
-                    semantic_relevance=score_raw,
-                    query_skills=q_skills,
-                    candidate_skills=[],
-                    query_technologies=q_tech,
-                    candidate_technologies=[],
-                    has_project_evidence=False,
-                    has_solution_evidence=False,
-                    best_evidence_type="RESEARCH",
-                )
-
-                if score < MIN_RELEVANCE_THRESHOLD:
-                    continue
+                # For research items, relevance directly reflects retrieval match quality
+                score = round(min(1.0, max(0.35, score_raw)), 4)
+                if score >= 0.70:
+                    relevance_level = "VERY_HIGH"
+                elif score >= 0.50:
+                    relevance_level = "HIGH"
+                elif score >= 0.35:
+                    relevance_level = "MEDIUM"
+                else:
+                    relevance_level = "LOW"
+                ev_strength = "STRONG" if score >= 0.50 else "MODERATE"
 
                 formatted_ev = self.evidence_service.format_evidence_items(
                     candidate_id=item_id,
@@ -426,34 +424,38 @@ class MatchingService:
         top_facilities: List[MatchingResult] = []
         if discovery.facilities and (discovery.facilities.facilities or discovery.facilities.equipment):
             all_fac_items = discovery.facilities.facilities + discovery.facilities.equipment
+            seen_fids = set()
             for fac in all_fac_items:
                 fac_id = str(fac.get("id") or fac.get("facility_id", ""))
+                if fac_id in seen_fids:
+                    continue
+                seen_fids.add(fac_id)
+
                 title = fac.get("name") or fac.get("title") or "Campus Laboratory"
                 dept = fac.get("department") or fac.get("location") or "Hardware Asset"
                 fac_meta = fac.get("metadata") or {}
                 eq_items = fac_meta.get("equipment", [])
+                matched_eq = fac_meta.get("matched_equipment")
                 resp_contact = fac_meta.get("responsible_user")
                 score_raw = float(fac.get("score") or fac.get("relevance") or 0.50)
 
-                score, relevance_level, ev_strength, _ = self.scoring_service.calculate_score(
-                    semantic_relevance=score_raw,
-                    query_skills=q_skills,
-                    candidate_skills=[],
-                    query_technologies=q_tech,
-                    candidate_technologies=[],
-                    has_project_evidence=False,
-                    has_solution_evidence=False,
-                    best_evidence_type="FACILITY",
-                )
-
-                if score < MIN_RELEVANCE_THRESHOLD:
-                    continue
+                # For non-person hardware facilities and equipment, relevance directly reflects retrieval match quality
+                score = round(min(1.0, max(0.35, score_raw)), 4)
+                if score >= 0.70:
+                    relevance_level = "VERY_HIGH"
+                elif score >= 0.50:
+                    relevance_level = "HIGH"
+                elif score >= 0.35:
+                    relevance_level = "MEDIUM"
+                else:
+                    relevance_level = "LOW"
+                ev_strength = "STRONG" if eq_items or score >= 0.50 else "MODERATE"
 
                 formatted_ev = self.evidence_service.format_evidence_items(
                     candidate_id=fac_id,
                     candidate_type="FACILITY",
                     raw_evidences=[],
-                    candidate_meta={"title": title, "description": fac.get("description")},
+                    candidate_meta={"title": title, "description": fac.get("description") or fac.get("snippet", "")},
                 )
 
                 explanation, help_type, strengths, limitations = self.explanation_service.generate_explanation(
@@ -468,6 +470,11 @@ class MatchingService:
                 )
 
                 fac_strengths = list(strengths)
+                if matched_eq:
+                    if isinstance(matched_eq, list):
+                        fac_strengths.insert(0, f"Matched Equipment: {', '.join(matched_eq[:3])}")
+                    else:
+                        fac_strengths.insert(0, f"Matched Equipment: {matched_eq}")
                 if eq_items:
                     fac_strengths.append(f"Equipment: {', '.join(eq_items[:4])}")
                 if resp_contact:
@@ -491,13 +498,22 @@ class MatchingService:
                         help_type=help_type,
                         strengths=fac_strengths,
                         limitations=limitations,
+                        metadata={"equipment": eq_items, "responsible_user": resp_contact},
                     )
                 )
 
         top_facilities.sort(key=lambda x: x.relevance_score, reverse=True)
 
         # Step 7: Build Potential Expertise Help Chain
-        help_chain = self.construct_help_chain(q_skills, q_tech, q_domains, top_people, top_projects)
+        help_chain = self.construct_help_chain(
+            query_skills=q_skills,
+            query_tech=q_tech,
+            query_domains=q_domains,
+            people_candidates=top_people,
+            project_candidates=top_projects,
+            diagnostic_areas=qu.diagnostic_areas,
+            problem_keywords=qu.problem_keywords,
+        )
 
         total_candidates = len(top_people) + len(top_projects) + len(top_solutions) + len(top_research) + len(top_facilities)
         result_composition = determine_result_composition(qu.intent)
@@ -505,11 +521,11 @@ class MatchingService:
         return MatchingAnalyzeResponse(
             query=query,
             understanding=qu,
-            top_people=top_people,
-            top_projects=top_projects,
-            top_solutions=top_solutions,
-            research=top_research,
-            facilities=top_facilities,
+            top_people=top_people[:5],
+            top_projects=top_projects[:5],
+            top_solutions=top_solutions[:5],
+            research=top_research[:5],
+            facilities=top_facilities[:5],
             help_chain=help_chain,
             traces=discovery.traces,
             result_composition=result_composition,
@@ -526,27 +542,43 @@ class MatchingService:
         query_domains: List[str],
         people_candidates: List[MatchingResult],
         project_candidates: List[MatchingResult],
+        diagnostic_areas: Optional[List[str]] = None,
+        problem_keywords: Optional[List[str]] = None,
     ) -> Optional[HelpChain]:
         """
         Constructs a deterministic initial Help Chain covering required capabilities.
         Uses a set-cover heuristic to identify 1-3 candidates spanning distinct problem dimensions.
         """
-        required_capabilities = list(dict.fromkeys(query_skills + query_tech + query_domains))
+        required_capabilities = list(dict.fromkeys(
+            [s for s in query_skills if s.strip()] +
+            [t for t in query_tech if t.strip()] +
+            [d for d in query_domains if d.strip()] +
+            [a for a in (diagnostic_areas or []) if len(a.strip()) > 2]
+        ))
         if not required_capabilities or not people_candidates:
             return None
 
         # Check if top 1 person genuinely covers all required query capabilities
         top_cand = people_candidates[0]
         top_cand_caps = {s.lower() for s in top_cand.matched_skills + top_cand.matched_technologies}
+        ev_graph = getattr(top_cand, "person_evidence_graph", None) or {}
+        for s in ev_graph.get("skills", []):
+            top_cand_caps.add(s.lower())
+
         q_skills_lower = {s.lower() for s in query_skills}
         q_tech_lower = {t.lower() for t in query_tech}
-        all_req_lower = q_skills_lower.union(q_tech_lower)
+        q_domains_lower = {d.lower() for d in query_domains}
+        q_diag_lower = {a.lower() for a in (diagnostic_areas or [])}
+        all_req_lower = q_skills_lower.union(q_tech_lower).union(q_domains_lower).union(q_diag_lower)
 
-        # Single candidate is sufficient ONLY if top_cand has high relevance AND covers all requested skills/tech
+        # Single candidate is sufficient ONLY if top_cand has high relevance AND covers all requested skills/tech/domains
+        # and the problem does NOT span multiple distinct domains or diagnostic areas
         is_single_sufficient = (
             bool(all_req_lower)
             and all_req_lower.issubset(top_cand_caps)
-            and top_cand.relevance_score >= 0.60
+            and top_cand.relevance_score >= 0.65
+            and len(query_domains) <= 1
+            and len(diagnostic_areas or []) <= 1
         )
         
         if is_single_sufficient or len(required_capabilities) <= 1:
@@ -576,10 +608,19 @@ class MatchingService:
         step = 1
         for cand in people_candidates:
             cand_skills_lower = set([s.lower() for s in cand.matched_skills + cand.matched_technologies])
-            newly_covered = uncovered.intersection(cand_skills_lower)
+            ev_graph = getattr(cand, "person_evidence_graph", None) or {}
+            for s in ev_graph.get("skills", []):
+                cand_skills_lower.add(s.lower())
 
-            if newly_covered or step == 1:
-                focus = ", ".join([s.title() for s in list(newly_covered or cand_skills_lower)[:2]]) or "Technical Guidance"
+            # Capability overlap
+            newly_covered = set()
+            for req in uncovered:
+                if any(req in cs or cs in req for cs in cand_skills_lower):
+                    newly_covered.add(req)
+
+            if newly_covered or (step == 1 and cand.relevance_score >= MIN_RELEVANCE_THRESHOLD):
+                covered_names = [r.title() for r in list(newly_covered)]
+                focus = ", ".join(covered_names[:2]) if covered_names else (", ".join([s.title() for s in cand.matched_skills[:2]]) or "Technical Guidance")
                 nodes.append(
                     HelpChainNode(
                         step_number=step,
@@ -591,11 +632,11 @@ class MatchingService:
                         matched_skills=cand.matched_skills,
                     )
                 )
-                covered_set.update(cand_skills_lower)
-                uncovered.difference_update(cand_skills_lower)
+                covered_set.update(newly_covered)
+                uncovered.difference_update(newly_covered)
                 step += 1
 
-            if step > 3 or not uncovered:
+            if step > 3 or (uncovered and len(covered_set) >= len(required_capabilities)):
                 break
 
         covered_list = [c.title() for c in list(covered_set)]
@@ -604,6 +645,6 @@ class MatchingService:
             needed_capabilities=required_capabilities,
             covered_capabilities=covered_list if covered_list else required_capabilities,
             nodes=nodes,
-            explanation=f"Potential Expertise Chain: Your problem spans {len(nodes)} distinct technical areas. CampusLink identified a potential expertise chain across complementary campus members.",
-            is_single_candidate_sufficient=False,
+            explanation=f"Potential Expertise Chain: Your problem spans {len(required_capabilities)} technical areas. CampusLink identified a {len(nodes)}-person expertise chain across complementary campus members.",
+            is_single_candidate_sufficient=(len(nodes) == 1),
         )

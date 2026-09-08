@@ -273,7 +273,15 @@ class SearchService:
                 if not user_id or creator_id != user_id:
                     return None
 
-            tech_list = [t.technology_name for t in proj.technologies] if hasattr(proj, "technologies") and proj.technologies else []
+            tech_list = []
+            if hasattr(proj, "technologies") and proj.technologies:
+                for t in proj.technologies:
+                    if hasattr(t, "name") and t.name:
+                        tech_list.append(t.name)
+                    elif hasattr(t, "technology_name") and t.technology_name:
+                        tech_list.append(t.technology_name)
+                    elif isinstance(t, str):
+                        tech_list.append(t)
             contributors_list = []
             if hasattr(proj, "contributors") and proj.contributors:
                 for c in proj.contributors:

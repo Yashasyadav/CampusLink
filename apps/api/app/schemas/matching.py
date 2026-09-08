@@ -49,6 +49,7 @@ class MatchingResult(BaseModel):
     help_type: Optional[HelpTypeEnum] = Field(default=None, description="Classified actionable help type")
     strengths: List[str] = Field(default=[], description="Key candidate strengths")
     limitations: List[str] = Field(default=[], description="Known limitations or capability gaps")
+    metadata: Dict[str, Any] = Field(default={}, description="Additional candidate metadata e.g. contributors, equipment")
 
 
 class HelpChainNode(BaseModel):

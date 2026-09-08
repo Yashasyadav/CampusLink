@@ -38,33 +38,41 @@ class PeopleDiscoveryAgent:
         query = query_understanding.original_query
         q_skills = query_understanding.skills or []
         q_tech = query_understanding.technologies or []
+        q_diagnostics = query_understanding.diagnostic_areas or []
+        q_keywords = query_understanding.problem_keywords or []
+
+        candidate_pool_limit = max(limit * 3, 15)
 
         try:
-            # 1. Semantic / hybrid vector search
-            search_res = search_people_tool(db, current_user, query, limit=limit)
+            # 1. Semantic / hybrid vector search across expanded candidate pool
+            search_res = search_people_tool(db, current_user, query, limit=candidate_pool_limit)
             semantic_results = search_res.results
 
-            # 2. DB-first fallback: always run if semantic results < limit
-            #    This ensures discovery even when profile embeddings are missing or low-scoring
-            db_candidates: List[dict] = []
-            if len(semantic_results) < limit:
-                db_candidates = search_people_by_skills_tool(
-                    db=db,
-                    current_user=current_user,
-                    skills=q_skills,
-                    technologies=q_tech,
-                    limit=limit * 2,  # fetch more to allow deduplication
-                )
-                logger.info(
-                    f"PeopleDiscoveryAgent: semantic={len(semantic_results)}, DB-fallback={len(db_candidates)}"
-                )
+            # 2. Structured relational DB discovery: ALWAYS run across skills, technologies, and diagnostic dimensions
+            #    This ensures discovery across multi-dimensional queries (e.g. ESP32 + TinyML + Audio)
+            search_terms = list(dict.fromkeys(
+                [s for s in q_skills if s.strip()] +
+                [t for t in q_tech if t.strip()] +
+                [d for d in q_diagnostics if len(d.strip()) > 2] +
+                [k for k in q_keywords if len(k.strip()) > 2]
+            ))
+
+            db_candidates = search_people_by_skills_tool(
+                db=db,
+                current_user=current_user,
+                skills=q_skills,
+                technologies=list(dict.fromkeys(q_tech + search_terms)),
+                limit=candidate_pool_limit,
+            )
+            logger.info(
+                f"PeopleDiscoveryAgent: semantic={len(semantic_results)}, DB-structured={len(db_candidates)}"
+            )
 
             # 3. Build a combined deduplicated candidate list
-            #    Prefer semantic results first; fill with DB candidates
             seen_user_ids: set = set()
+            combined_items = []
 
             # Add semantic results
-            combined_items = []
             for item in semantic_results:
                 uid_str = str(item.entity_id)
                 if uid_str == str(current_user.id):
@@ -73,7 +81,7 @@ class PeopleDiscoveryAgent:
                     seen_user_ids.add(uid_str)
                     combined_items.append(("SEMANTIC", item, None))
 
-            # Add DB-first candidates not already found by semantic search
+            # Add DB-structured candidates not already found by semantic search
             for db_cand in db_candidates:
                 uid_str = str(db_cand.get("user_id", ""))
                 if uid_str == str(current_user.id):
@@ -82,12 +90,13 @@ class PeopleDiscoveryAgent:
                     seen_user_ids.add(uid_str)
                     combined_items.append(("DB", None, db_cand))
 
-            # 4. Process each candidate into PeopleCandidate
+            # 4. Process candidates into PeopleCandidate up to candidate_pool_limit
             candidates: List[PeopleCandidate] = []
+            selected_items = combined_items[:candidate_pool_limit]
 
             # Pre-collect valid target candidate UUIDs for batch retrieval
             target_cand_ids: List[uuid.UUID] = []
-            for source, semantic_item, db_item in combined_items[:limit]:
+            for source, semantic_item, db_item in selected_items:
                 try:
                     if source == "SEMANTIC":
                         cid = semantic_item.entity_id
@@ -102,7 +111,7 @@ class PeopleDiscoveryAgent:
             profiles_batch = get_profiles_batch(db, current_user, target_cand_ids)
             evidence_graphs_batch = get_person_evidence_graphs_batch(db, current_user, target_cand_ids)
 
-            for source, semantic_item, db_item in combined_items[:limit]:
+            for source, semantic_item, db_item in selected_items:
                 try:
                     if source == "SEMANTIC":
                         entity_id = semantic_item.entity_id

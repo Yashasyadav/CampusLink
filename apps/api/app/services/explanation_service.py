@@ -62,8 +62,13 @@ class ExplanationService:
             evidence_items,
         )
 
-        # 4. If real LLM client is available, attempt concise summary generation
-        if hasattr(self.llm_provider, "_client") and self.llm_provider._client is not None:
+        # 4. If real LLM client is available and candidate is a high-relevance match with evidence, attempt concise summary generation
+        if (
+            hasattr(self.llm_provider, "_client")
+            and self.llm_provider._client is not None
+            and relevance_score >= 0.70
+            and len(evidence_items) > 0
+        ):
             try:
                 evidence_snippets = "\n".join([f"- [{ev.source_type}] {ev.source_title}: {ev.snippet}" for ev in evidence_items[:3]])
                 prompt = (

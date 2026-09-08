@@ -379,8 +379,8 @@ function DiscoverContent() {
                   )}
                 </section>
 
-                {/* 2. HELP CHAIN (WHEN APPLICABLE) */}
-                {matchingData.help_chain && (
+                {/* 2. HELP CHAIN (WHEN APPLICABLE: ONLY FOR PEOPLE INTENT OR GENUINE MULTI-PERSON CHAINS) */}
+                {matchingData.help_chain && (primaryType === "PEOPLE" || !matchingData.help_chain.is_single_candidate_sufficient) && (
                   <HelpChainSection helpChain={matchingData.help_chain} />
                 )}
 
@@ -393,13 +393,19 @@ function DiscoverContent() {
                   if (!secCat || secCat.items.length === 0) {
                     return null; // Strict rule: never render empty secondary sections!
                   }
+                  const displayTitle = (secType === "PEOPLE" && primaryType === "FACILITIES")
+                    ? "Related Expertise: People Who May Help"
+                    : (secType === "PEOPLE" && primaryType !== "PEOPLE")
+                    ? "Related Contributors & Expertise"
+                    : secCat.title;
+
                   return (
                     <section key={secType}>
                       <SectionHeader
                         icon={secCat.icon}
                         iconColor={secCat.iconColor}
                         iconBg={secCat.iconBg}
-                        title={secCat.title}
+                        title={displayTitle}
                         count={secCat.items.length}
                         badge="Supporting Context"
                         badgeColor="bg-slate-100 text-slate-700 border-slate-200"

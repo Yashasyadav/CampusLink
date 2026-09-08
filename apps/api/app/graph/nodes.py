@@ -364,27 +364,33 @@ def node_rank_matches(state: DiscoveryGraphState, config: RunnableConfig = None)
         title = proj.get("title", "Campus Project")
         skills = proj.get("skills", [])
         tech = proj.get("technologies", [])
+        contributors = proj.get("contributors", [])
         score_raw = float(proj.get("score") or proj.get("relevance") or 0.50)
 
-        score, lvl, ev_str, _ = scoring_service.calculate_score(
-            semantic_relevance=score_raw,
-            query_skills=q_skills,
-            candidate_skills=skills,
-            query_technologies=q_tech,
-            candidate_technologies=tech,
-            has_project_evidence=True,
-            has_solution_evidence=False,
-            best_evidence_type="PROJECT",
-        )
+        tech_match = any(t.lower() in [qt.lower() for qt in q_tech] for t in tech) if tech and q_tech else False
+        skill_match = any(s.lower() in [qs.lower() for qs in q_skills] for s in skills) if skills and q_skills else False
+        boost = 0.15 if tech_match else (0.10 if skill_match else 0.0)
+        score = round(min(1.0, max(0.35, score_raw + boost)), 4)
+        if score >= 0.70:
+            lvl = "VERY_HIGH"
+        elif score >= 0.50:
+            lvl = "HIGH"
+        elif score >= 0.35:
+            lvl = "MEDIUM"
+        else:
+            lvl = "LOW"
+        ev_str = "STRONG" if tech_match or score >= 0.50 else "MODERATE"
 
         if score < 0.35:
             continue
+
+        proj_subtitle = f"Contributors: {', '.join(contributors[:3])}" if contributors else (proj.get("domain") or "Campus Project")
 
         top_projects.append({
             "candidate_id": proj_id,
             "candidate_type": "PROJECT",
             "title": title,
-            "subtitle": "Campus Project",
+            "subtitle": proj_subtitle,
             "relevance_score": score,
             "relevance_level": lvl,
             "matched_skills": skills,
@@ -392,7 +398,7 @@ def node_rank_matches(state: DiscoveryGraphState, config: RunnableConfig = None)
             "matched_domains": q_domains,
             "evidence_strength": ev_str,
             "supporting_evidence": [],
-            "explanation": f"{lvl} as a similar campus project.",
+            "explanation": f"{lvl} relevance as a related campus project.",
             "strengths": [f"Technologies: {', '.join(tech[:3])}"] if tech else ["Campus Project"],
             "limitations": [],
         })
@@ -404,7 +410,19 @@ def node_rank_matches(state: DiscoveryGraphState, config: RunnableConfig = None)
     typed_people = [MatchingResult.model_validate(p) for p in top_people]
     typed_projects = [MatchingResult.model_validate(pr) for pr in top_projects]
 
-    help_chain_obj = matching_service.construct_help_chain(q_skills, q_tech, q_domains, typed_people, typed_projects)
+    qu_dict = state.get("query_understanding") or {}
+    q_diagnostics = qu_dict.get("diagnostic_areas", [])
+    q_keywords = qu_dict.get("problem_keywords", [])
+
+    help_chain_obj = matching_service.construct_help_chain(
+        query_skills=q_skills,
+        query_tech=q_tech,
+        query_domains=q_domains,
+        people_candidates=typed_people,
+        project_candidates=typed_projects,
+        diagnostic_areas=q_diagnostics,
+        problem_keywords=q_keywords,
+    )
     help_chain_dict = help_chain_obj.model_dump() if help_chain_obj else None
 
     t_dur = round((time.time() - t0) * 1000, 2)
@@ -415,14 +433,14 @@ def node_rank_matches(state: DiscoveryGraphState, config: RunnableConfig = None)
         "started_at": start_iso,
         "completed_at": end_iso,
         "tools_called": [],
-        "result_count": len(top_people) + len(top_projects),
+        "result_count": len(top_people[:5]) + len(top_projects[:5]),
         "status": "SUCCESS",
         "duration_ms": t_dur,
     }
 
     return {
-        "top_people": top_people,
-        "top_projects": top_projects,
+        "top_people": top_people[:5],
+        "top_projects": top_projects[:5],
         "help_chain": help_chain_dict,
         "current_stage": "MATCHES_RANKED",
         "agent_trace": [trace_entry],

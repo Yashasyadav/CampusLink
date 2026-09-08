@@ -72,7 +72,7 @@ def search_people_by_skills_tool(
                     matched_user_ids.add(str(us.user_id))
                     matched_reasons.setdefault(str(us.user_id), []).append(us.skill.name)
 
-    # 2. Find users who contribute to projects that match the terms (by project title/description)
+    # 2. Find users who contribute to or own projects matching the terms
     from app.models.projects import ProjectContributor
     contrib_rows = db.query(ProjectContributor).all()
     for c in contrib_rows:
@@ -90,6 +90,20 @@ def search_people_by_skills_tool(
             if uid != str(current_user.id):
                 matched_user_ids.add(uid)
                 matched_reasons.setdefault(uid, []).append(f"Project: {proj.title}")
+
+    # Also check project creators directly
+    all_projects = db.query(Project).all()
+    for proj in all_projects:
+        if not proj.created_by or str(proj.created_by) == str(current_user.id):
+            continue
+        vis = proj.visibility.value if hasattr(proj.visibility, "value") else str(proj.visibility)
+        if vis == "PRIVATE" and str(proj.created_by) != str(current_user.id):
+            continue
+        combined_text = f"{proj.title} {proj.description or ''}".lower()
+        if any(term in combined_text for term in all_terms):
+            uid = str(proj.created_by)
+            matched_user_ids.add(uid)
+            matched_reasons.setdefault(uid, []).append(f"Project Lead: {proj.title}")
 
     # 3. Find users who authored relevant problem solutions
     from app.models.knowledge import ProblemSolution as PS

@@ -145,13 +145,22 @@ def build_facility_text(facility: Facility) -> Optional[str]:
     if facility.description:
         parts.append(f"Description: {facility.description.strip()}")
 
+    if getattr(facility, "capabilities", None):
+        parts.append(f"Capabilities: {facility.capabilities.strip()}")
+
     if facility.operating_hours:
         parts.append(f"Operating Hours: {facility.operating_hours.strip()}")
 
     if hasattr(facility, "equipment") and facility.equipment:
-        eq_names = [e.name for e in facility.equipment if hasattr(e, "name")]
-        if eq_names:
-            parts.append(f"Equipment Available: {', '.join(eq_names)}")
+        eq_details = []
+        for e in facility.equipment:
+            if hasattr(e, "name") and e.name:
+                eq_str = e.name
+                if getattr(e, "capability", None):
+                    eq_str += f" ({e.capability})"
+                eq_details.append(eq_str)
+        if eq_details:
+            parts.append(f"Equipment Available: {', '.join(eq_details)}")
 
     return "\n".join(parts)
 
@@ -173,8 +182,16 @@ def build_equipment_text(equipment: Equipment) -> Optional[str]:
     if equipment.description:
         parts.append(f"Description: {equipment.description.strip()}")
 
+    if getattr(equipment, "capability", None):
+        parts.append(f"Capability: {equipment.capability.strip()}")
+
     if hasattr(equipment, "facility") and equipment.facility and hasattr(equipment.facility, "name"):
-        parts.append(f"Facility: {equipment.facility.name}")
+        fac_info = equipment.facility.name
+        if getattr(equipment.facility, "department", None):
+            fac_info += f" ({equipment.facility.department})"
+        if getattr(equipment.facility, "capabilities", None):
+            fac_info += f" - {equipment.facility.capabilities}"
+        parts.append(f"Facility: {fac_info}")
 
     return "\n".join(parts)
 

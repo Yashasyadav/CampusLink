@@ -534,7 +534,24 @@ def run_seed(force: bool = False):
             availability_notes="GPU cluster queue available to CS researchers.",
         )
 
-        session.add_all([fac1, fac2, fac3])
+        fac4 = Facility(
+            name="VLSI Design & Circuit Testing Laboratory",
+            facility_type="LABORATORY",
+            location="Engineering Block D, Room 310",
+            building="Block D",
+            floor="3rd Floor",
+            department="Electronics & Electrical Engineering",
+            contact_email="vlsi-lab@campuslink.test",
+            operating_hours="Mon-Fri 08:30 - 19:30",
+            description="Specialized laboratory for VLSI circuit testing, digital and analog IC characterization, FPGA emulation, and silicon verification.",
+            capabilities="VLSI circuit testing, ASIC logic analysis, digital oscilloscope signal integrity, FPGA synthesis, microelectronic testing.",
+            responsible_user=faculty1,
+            status=FacilityStatus.OPERATIONAL,
+            visibility=FacilityVisibility.PUBLIC,
+            availability_notes="Available for VLSI coursework, research verification, and hardware testing reservations.",
+        )
+
+        session.add_all([fac1, fac2, fac3, fac4])
         session.flush()
 
         # Equipment Assets
@@ -626,8 +643,52 @@ def run_seed(force: bool = False):
             availability_status=AvailabilityStatus.AVAILABLE,
             visibility=EquipmentVisibility.PUBLIC,
         )
+        eq9 = Equipment(
+            facility=fac4,
+            name="Digital Storage Oscilloscope",
+            category="Test Equipment",
+            description="Keysight 4-channel 500MHz digital storage oscilloscope for high-speed VLSI circuit testing and signal integrity analysis.",
+            capability="VLSI clock jitter measurement, transient waveform capture, mixed-signal debugging.",
+            quantity=6,
+            status=EquipmentStatus.OPERATIONAL,
+            availability_status=AvailabilityStatus.AVAILABLE,
+            visibility=EquipmentVisibility.PUBLIC,
+        )
+        eq10 = Equipment(
+            facility=fac4,
+            name="Logic Analyzer",
+            category="Test Equipment",
+            description="34-channel high-speed state and timing logic analyzer for digital circuit and bus verification.",
+            capability="Digital bus decoding, timing glitch capture, multi-channel logic analysis for VLSI circuit testing.",
+            quantity=8,
+            status=EquipmentStatus.OPERATIONAL,
+            availability_status=AvailabilityStatus.AVAILABLE,
+            visibility=EquipmentVisibility.PUBLIC,
+        )
+        eq11 = Equipment(
+            facility=fac4,
+            name="FPGA Development Board",
+            category="Hardware Prototyping",
+            description="Xilinx Artix-7 and UltraScale FPGA evaluation boards for digital logic synthesis and emulation.",
+            capability="Hardware emulation, RTL prototyping, high-speed serial I/O testing for VLSI circuits.",
+            quantity=12,
+            status=EquipmentStatus.OPERATIONAL,
+            availability_status=AvailabilityStatus.AVAILABLE,
+            visibility=EquipmentVisibility.PUBLIC,
+        )
+        eq12 = Equipment(
+            facility=fac4,
+            name="VLSI Testing Kit",
+            category="Test Equipment",
+            description="Comprehensive VLSI circuit testing and IC characterization bench with specialized probe cards and test sockets.",
+            capability="IC parametric testing, fault simulation verification, silicon test fixture automation.",
+            quantity=5,
+            status=EquipmentStatus.OPERATIONAL,
+            availability_status=AvailabilityStatus.AVAILABLE,
+            visibility=EquipmentVisibility.PUBLIC,
+        )
 
-        session.add_all([eq1, eq2, eq3, eq4, eq5, eq6, eq7, eq8])
+        session.add_all([eq1, eq2, eq3, eq4, eq5, eq6, eq7, eq8, eq9, eq10, eq11, eq12])
 
         # ---------------------------------------------------------------------
         # 5. Projects & Contributors (10 Projects)
