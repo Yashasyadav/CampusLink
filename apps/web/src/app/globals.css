@@ -793,3 +793,94 @@ canvas.fixed.inset-0 {
   animation: fade-in 800ms ease-out forwards;
   opacity: 0;
 }
+
+/* Premium Ant Design search workspace */
+.campus-search-page { --search-accent: #2563eb; }
+.campus-search-heading {
+  padding: 4px 2px;
+}
+.campus-search-heading > div > div:first-child {
+  width: 48px;
+  height: 48px;
+  border: 1px solid #dbeafe;
+  border-radius: 15px;
+  background: linear-gradient(145deg, #fff, #eff6ff);
+  box-shadow: 0 8px 22px rgb(37 99 235 / .12);
+}
+.campus-search-panel {
+  overflow: hidden;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 20px !important;
+  background: #fff !important;
+  box-shadow: 0 18px 45px -32px rgb(15 23 42 / .35), 0 2px 8px rgb(15 23 42 / .04) !important;
+}
+.campus-search-input {
+  padding: 7px !important;
+  border: 0 !important;
+  border-bottom: 1px solid #eef2f7 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.campus-search-input:focus-within {
+  box-shadow: inset 0 0 0 2px rgb(37 99 235 / .13) !important;
+}
+.campus-search-input .ant-input {
+  font-size: 15px !important;
+  color: #0f172a !important;
+}
+.campus-search-input .ant-input-search-button {
+  min-width: 120px;
+  border-radius: 12px !important;
+  background: linear-gradient(135deg, #2f6ff0, #1d4ed8) !important;
+  box-shadow: 0 6px 18px rgb(37 99 235 / .25);
+}
+.campus-search-toolbar {
+  padding: 18px 20px 20px;
+  background: linear-gradient(180deg, #fff, #fbfdff);
+}
+.campus-search-toolbar .ant-radio-button-wrapper {
+  height: 38px;
+  border-color: #e2e8f0;
+  font-size: 12px;
+  line-height: 36px;
+}
+.campus-search-toolbar .ant-radio-button-wrapper:first-child {
+  border-start-start-radius: 10px;
+  border-end-start-radius: 10px;
+}
+.campus-search-toolbar .ant-radio-button-wrapper:last-child {
+  border-start-end-radius: 10px;
+  border-end-end-radius: 10px;
+}
+.campus-search-toolbar .ant-btn {
+  height: 38px;
+  border-color: #e2e8f0;
+  border-radius: 10px !important;
+  box-shadow: 0 1px 2px rgb(15 23 42 / .03);
+}
+.campus-search-toolbar .ant-btn-default:hover {
+  border-color: #bfdbfe !important;
+  background: #f8fbff !important;
+}
+.campus-search-empty-card {
+  overflow: hidden;
+  border: 1px solid #e8edf4 !important;
+  border-radius: 24px !important;
+  background: radial-gradient(circle at 50% 0, #eff6ff 0, #fff 34%) !important;
+  box-shadow: 0 22px 55px -42px rgb(15 23 42 / .4) !important;
+}
+.campus-search-empty-card .ant-empty {
+  padding-top: 36px;
+}
+.campus-search-result-card {
+  border-radius: 16px !important;
+  box-shadow: 0 5px 18px rgb(15 23 42 / .045) !important;
+}
+.campus-search-result-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgb(37 99 235 / .1) !important;
+}
+@media (max-width: 640px) {
+  .campus-search-input .ant-input-search-button { min-width: 48px; }
+  .campus-search-toolbar { padding: 16px; }
+}

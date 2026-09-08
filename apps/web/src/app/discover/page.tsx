@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/layout/app-shell";
 import { ProtectedRoute } from "@/components/layout/protected-route";
-import { Input, Button, Tag, Alert, ConfigProvider, Card } from "antd";
+import { Input, Button, Tag, Alert, ConfigProvider, Card, Tooltip } from "antd";
 import {
   Compass, Sparkles, User, FolderGit2, BookOpen,
   Building2, ArrowRight, Loader2, AlertCircle,
@@ -42,6 +42,7 @@ function DiscoverContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showTraces, setShowTraces] = useState(false);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
 
   const handleDiscover = async (q?: string) => {
     const finalQuery = q || query;
@@ -65,86 +66,185 @@ function DiscoverContent() {
     <div className="max-w-page mx-auto px-6 md:px-10 py-8 space-y-10 animate-fade-in">
 
       {/* ── HERO / QUERY BAR ── */}
-      <Card
-        bordered={false}
-        className="relative overflow-hidden transition-all duration-300 border-none shadow-xl"
+      <div
+        className="relative overflow-hidden transition-all duration-300 shadow-2xl"
         style={{ 
-          background: "linear-gradient(135deg, #1E40AF 0%, #2563EB 50%, #1D4ED8 100%)",
+          background: "linear-gradient(135deg, #1e40af 0%, #2563eb 50%, #1d4ed8 100%)",
           borderRadius: 24,
-        }}
-        styles={{
-          body: {
-            padding: matchingData ? "24px 32px" : "32px 48px",
-          }
+          border: "1px solid rgba(255, 255, 255, 0.2)",
+          boxShadow: "0 20px 50px -15px rgba(29, 78, 216, 0.45)",
+          padding: matchingData ? "28px 36px" : "36px 44px",
         }}
       >
-        <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-white/5 pointer-events-none" />
-        <div className="absolute -bottom-10 -left-10 w-48 h-48 rounded-full bg-orange-500/10 pointer-events-none" />
+        {/* Luminous blue aurora ambient spots */}
+        <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-sky-300/20 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-20 -left-16 w-72 h-72 rounded-full bg-blue-300/20 blur-3xl pointer-events-none" />
+
+        {/* High-Tech Micro-grid Pattern Overlay */}
+        <div
+          className="absolute inset-0 pointer-events-none opacity-[0.06]"
+          style={{
+            backgroundImage: "linear-gradient(to right, rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.2) 1px, transparent 1px)",
+            backgroundSize: "32px 32px",
+            maskImage: "linear-gradient(to right, black, transparent 80%)",
+            WebkitMaskImage: "linear-gradient(to right, black, transparent 80%)",
+          }}
+        />
 
         <div className="relative z-10 max-w-3xl">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur border border-white/20 text-[11px] font-bold uppercase tracking-widest text-blue-100 mb-4">
-            <Sparkles className="w-3.5 h-3.5 text-orange-400" />
-            Phase 8 — Matching & Explanation Intelligence
+          {/* Phase / Status Tag */}
+          <div
+            className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full mb-4 transition-all duration-300 select-none shadow-sm"
+            style={{
+              background: "rgba(255, 255, 255, 0.15)",
+              backdropFilter: "blur(16px)",
+              WebkitBackdropFilter: "blur(16px)",
+              border: "1px solid rgba(255, 255, 255, 0.25)",
+            }}
+          >
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+            </span>
+            <span
+              className="text-white font-semibold text-[11px] uppercase tracking-wider"
+              style={{ letterSpacing: "0.08em" }}
+            >
+              Campus Intelligence Engine <span className="text-blue-200 mx-1">•</span> Real-time Matching
+            </span>
           </div>
 
-          <h1 className={`font-extrabold tracking-tight text-white mb-3 ${matchingData ? "text-2xl md:text-3xl" : "text-3xl md:text-5xl"}`}>
-            Turn campus knowledge into your next <span className="text-orange-400">breakthrough</span>.
+          <h1
+            className="text-white mb-3"
+            style={{
+              fontSize: matchingData ? "clamp(1.75rem, 2.5vw, 2.25rem)" : "clamp(2rem, 3.5vw, 3rem)",
+              fontWeight: 800,
+              letterSpacing: "-0.02em",
+              lineHeight: 1.15,
+            }}
+          >
+            Turn campus knowledge into your next{" "}
+            <span
+              style={{
+                background: "linear-gradient(135deg, #fef08a 0%, #fde047 40%, #f59e0b 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                filter: "drop-shadow(0 2px 14px rgba(245, 158, 11, 0.35))",
+              }}
+            >
+              breakthrough.
+            </span>
           </h1>
 
           {!matchingData && (
-            <p className="text-blue-100 text-sm md:text-base max-w-xl leading-relaxed mb-6">
+            <p
+              className="mb-6 leading-relaxed"
+              style={{
+                color: "rgba(255, 255, 255, 0.9)",
+                fontSize: "14px",
+                maxWidth: "680px",
+                lineHeight: 1.6,
+              }}
+            >
               Describe a technical problem. CampusLink identifies top candidates, explains why they match, surfaces supporting evidence, and maps potential help chains.
             </p>
           )}
         </div>
 
-        {/* Search input form */}
+        {/* Omnibox / AI Search Bar (Centerpiece) */}
         <div className="relative z-10 mt-6">
-          <ConfigProvider
-            theme={{
-              token: {
-                colorPrimary: '#2563eb',
-                borderRadius: 12,
-                controlHeightLG: 56,
-              },
+          <div
+            className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-0 transition-all duration-300"
+            style={{
+              background: "#ffffff",
+              borderRadius: 16,
+              padding: "6px 8px 6px 16px",
+              boxShadow: isSearchFocused
+                ? "0 0 0 3px rgba(147, 197, 253, 0.6), 0 16px 38px rgba(0, 0, 0, 0.22)"
+                : "0 10px 30px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.3)",
             }}
           >
-            <Input.Search
-              prefix={<Compass className="w-5 h-5 text-blue-600 mr-2" />}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onSearch={() => handleDiscover()}
-              placeholder="Describe your campus problem or research need…"
-              size="large"
-              enterButton={
-                <Button type="primary" size="large" icon={!loading && <Sparkles className="w-4 h-4" />} loading={loading} style={{ fontWeight: 'bold', padding: '0 24px' }}>
-                  Discover
-                </Button>
-              }
-              className="shadow-xl focus-within:ring-2 focus-within:ring-orange-400/50 rounded-2xl"
-              style={{ padding: '4px', background: 'white', borderRadius: '16px' }}
-            />
-          </ConfigProvider>
+            <div className="flex items-center flex-1 min-w-0 py-1 sm:py-0">
+              <Compass className="w-5 h-5 text-blue-600 mr-2.5 shrink-0" />
+              <Input
+                variant="borderless"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onPressEnter={() => handleDiscover()}
+                onFocus={() => setIsSearchFocused(true)}
+                onBlur={() => setIsSearchFocused(false)}
+                placeholder="Describe your campus problem or research need…"
+                className="w-full text-[15px] p-0 font-normal"
+                style={{
+                  fontSize: "15px",
+                  color: "#0f172a",
+                  boxShadow: "none",
+                }}
+              />
+            </div>
+            <Button
+              type="primary"
+              onClick={() => handleDiscover()}
+              loading={loading}
+              icon={!loading && <Sparkles className="w-4 h-4" />}
+              className="shrink-0 flex items-center justify-center gap-2"
+              style={{
+                borderRadius: 12,
+                height: 44,
+                padding: "0 24px",
+                fontWeight: 700,
+                fontSize: "14px",
+                background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+                boxShadow: "0 4px 16px rgba(37, 99, 235, 0.4)",
+                border: "none",
+              }}
+            >
+              Discover
+            </Button>
+          </div>
 
           {!matchingData && !loading && (
             <div className="flex flex-wrap gap-2 mt-4 items-center">
-              <span className="text-[12px] font-medium text-blue-200 flex items-center gap-1 mr-1">
-                <Zap className="w-3.5 h-3.5 text-orange-400" /> Try:
+              <span className="text-[12.5px] font-semibold text-blue-100 flex items-center gap-1.5 mr-1 select-none">
+                <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300/30" /> Try:
               </span>
-              {EXAMPLE_QUERIES.map((q) => (
-                <Tag
-                  key={q}
-                  className="cursor-pointer bg-white/10 hover:bg-white/20 border-white/20 text-blue-100 py-1 px-3 text-[12px] transition"
-                  onClick={() => handleDiscover(q)}
-                  style={{ borderRadius: '100px' }}
-                >
-                  {q.length > 40 ? q.substring(0, 40) + "..." : q}
-                </Tag>
-              ))}
+              {EXAMPLE_QUERIES.map((q) => {
+                const isTruncated = q.length > 42;
+                const chip = (
+                  <Tag
+                    key={q}
+                    className="m-0 inline-flex items-center cursor-pointer select-none transition-all duration-200 hover:scale-[1.02]"
+                    onClick={() => handleDiscover(q)}
+                    style={{
+                      background: "rgba(255, 255, 255, 0.14)",
+                      border: "1px solid rgba(255, 255, 255, 0.22)",
+                      backdropFilter: "blur(14px)",
+                      WebkitBackdropFilter: "blur(14px)",
+                      color: "#ffffff",
+                      borderRadius: 100,
+                      padding: "4px 14px",
+                      fontSize: "12px",
+                      fontWeight: 500,
+                    }}
+                  >
+                    <span className="truncate max-w-[280px]">
+                      {isTruncated ? q.substring(0, 42) + "…" : q}
+                    </span>
+                  </Tag>
+                );
+
+                return isTruncated ? (
+                  <Tooltip key={q} title={q} placement="bottom" arrow={{ pointAtCenter: true }}>
+                    {chip}
+                  </Tooltip>
+                ) : (
+                  chip
+                );
+              })}
             </div>
           )}
         </div>
-      </Card>
+      </div>
 
       {/* ── ERROR DISPLAY ── */}
       {error && (

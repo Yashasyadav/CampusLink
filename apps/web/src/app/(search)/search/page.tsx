@@ -104,9 +104,9 @@ function SearchContent() {
   const countByType = (type: EntityTypeFilter) => results.filter((r) => r.entity_type === type).length;
 
   return (
-    <div className="max-w-page mx-auto px-6 md:px-10 py-8 space-y-8 animate-fade-in">
+    <div className="campus-search-page max-w-page mx-auto px-6 md:px-10 py-8 space-y-8 animate-fade-in">
       {/* ── HEADER ── */}
-      <div className="space-y-2">
+      <div className="campus-search-heading space-y-2">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center">
             <SearchIcon className="w-5 h-5 text-blue-600" />
@@ -119,7 +119,7 @@ function SearchContent() {
       </div>
 
       {/* ── SEARCH BAR ── */}
-      <div className="space-y-4">
+      <Card bordered={false} className="campus-search-panel" styles={{ body: { padding: 0 } }}>
         <ConfigProvider
           theme={{
             token: { colorPrimary: '#2563eb', borderRadius: 12, controlHeightLG: 64 },
@@ -132,7 +132,7 @@ function SearchContent() {
             onSearch={() => executeSearch()}
             placeholder="Search people, projects, research papers, labs, equipment, solutions…"
             size="large"
-            className="shadow-card bg-white rounded-2xl"
+            className="campus-search-input"
             style={{ borderRadius: '16px', padding: 4 }}
             enterButton={
               <Button type="primary" size="large" loading={loading} icon={!loading && <SearchIcon className="w-4 h-4" />} style={{ padding: '0 24px', fontWeight: 'bold' }}>
@@ -143,7 +143,7 @@ function SearchContent() {
         </ConfigProvider>
 
         {/* Search options */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="campus-search-toolbar flex flex-col sm:flex-row sm:items-center gap-4">
           {/* Mode toggle */}
           <div className="flex items-center gap-2">
             <span className="text-[12px] font-semibold text-slate-500">Mode:</span>
@@ -177,7 +177,7 @@ function SearchContent() {
             ))}
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* ── RESULTS HEADER & TABS ── */}
       {hasSearched && !loading && !error && total !== null && (
@@ -232,7 +232,7 @@ function SearchContent() {
 
       {/* ── EMPTY INITIAL STATE ── */}
       {!hasSearched && !loading && (
-        <Card className="rounded-3xl shadow-card border-slate-200" bordered={false}>
+        <Card className="campus-search-empty-card" bordered={false}>
           <div className="text-center py-8">
             <Empty
               image={<div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto"><SearchIcon className="w-8 h-8 text-blue-500" /></div>}
@@ -295,7 +295,7 @@ function SearchResultCard({ result }: { result: SearchResultItem }) {
   return (
     <Card 
       bordered={false}
-      className="group border border-slate-200 hover:border-blue-300 shadow-sm hover:shadow-md transition-all"
+      className="campus-search-result-card group border border-slate-200 hover:border-blue-300 shadow-sm hover:shadow-md transition-all"
       style={{ borderRadius: 16 }}
       styles={{ body: { padding: 20 } }}
     >
