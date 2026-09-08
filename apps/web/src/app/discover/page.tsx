@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { matchingApi } from "@/lib/api/matching";
 import { feedbackApi, FeedbackType } from "@/lib/api/feedback";
-import { MatchingAnalyzeResponse, MatchingResult, HelpChain } from "@/types/matching";
+import { MatchingAnalyzeResponse, MatchingResult, HelpChain, ResultType } from "@/types/matching";
 import { getEvidenceDetails } from "@/lib/evidence";
 
 const EXAMPLE_QUERIES = [
@@ -208,7 +208,7 @@ function DiscoverContent() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 text-[13px]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-[13px]">
               <div>
                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">Domains</p>
                 <div className="flex flex-wrap gap-1.5">
@@ -249,84 +249,178 @@ function DiscoverContent() {
                   ) : <span className="text-slate-400 italic">General Investigation</span>}
                 </div>
               </div>
+              {matchingData.understanding.resource_needs && matchingData.understanding.resource_needs.length > 0 && (
+                <div>
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">Resource Needs</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {matchingData.understanding.resource_needs.map((rn, i) => (
+                      <span key={i} className="px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 font-medium">{rn}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </section>
 
-          {/* POTENTIAL EXPERTISE CHAIN SECTION */}
-          {matchingData.help_chain && (
-            <HelpChainSection helpChain={matchingData.help_chain} />
-          )}
+          {/* INTENT-AWARE KNOWLEDGE COMPOSITION */}
+          {(() => {
+            const comp = matchingData.result_composition || {
+              primary_result_type: "PEOPLE" as ResultType,
+              secondary_result_types: ["PROJECTS", "SOLUTIONS", "RESEARCH", "FACILITIES"] as ResultType[],
+              evidence_only_types: [] as ResultType[],
+            };
 
-          {/* PEOPLE WHO CAN HELP */}
-          <section>
-            <SectionHeader icon={User} iconColor="text-blue-600" iconBg="bg-blue-50" title="People Who Can Help" count={matchingData.top_people.length} />
-            {matchingData.top_people.length === 0 ? (
-              <EmptyCategoryMessage message="No public campus members with matching evidence found for this query." />
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-4">
-                {matchingData.top_people.map((item) => (
-                  <CandidateCard key={item.candidate_id} item={item} href={`/profile/${item.candidate_id}`} actionLabel="View Profile" />
-                ))}
+            const primaryType: ResultType = comp.primary_result_type;
+            const secondaryTypes: ResultType[] = comp.secondary_result_types || [];
+            const evidenceOnlyTypes = new Set(comp.evidence_only_types || []);
+
+            const categoryMap: Record<ResultType, {
+              title: string;
+              icon: any;
+              iconColor: string;
+              iconBg: string;
+              items: MatchingResult[];
+              hrefPrefix: string;
+              actionLabel: string;
+              isSolution?: boolean;
+              emptyMessage: string;
+              emptyFallback: string;
+            }> = {
+              PEOPLE: {
+                title: "People Who Can Help",
+                icon: User,
+                iconColor: "text-blue-600",
+                iconBg: "bg-blue-50",
+                items: matchingData.top_people,
+                hrefPrefix: "/profile/",
+                actionLabel: "View Profile",
+                emptyMessage: "No matching campus members found for this query.",
+                emptyFallback: "Related campus projects or laboratories may still provide useful guidance.",
+              },
+              FACILITIES: {
+                title: "Relevant Facilities & Equipment",
+                icon: Building2,
+                iconColor: "text-purple-600",
+                iconBg: "bg-purple-50",
+                items: matchingData.facilities,
+                hrefPrefix: "/facilities/",
+                actionLabel: "View Facility",
+                emptyMessage: "No matching laboratories or hardware facilities found.",
+                emptyFallback: "Related people and research contacts may still be able to help.",
+              },
+              PROJECTS: {
+                title: "Relevant Projects",
+                icon: FolderGit2,
+                iconColor: "text-indigo-600",
+                iconBg: "bg-indigo-50",
+                items: matchingData.top_projects,
+                hrefPrefix: "/projects/",
+                actionLabel: "View Project",
+                emptyMessage: "No matching campus projects indexed yet.",
+                emptyFallback: "Related campus researchers or contributors may be working on similar topics.",
+              },
+              SOLUTIONS: {
+                title: "Top Previous Solutions",
+                icon: Lightbulb,
+                iconColor: "text-orange-500",
+                iconBg: "bg-orange-50",
+                items: matchingData.top_solutions,
+                hrefPrefix: "/solutions",
+                actionLabel: "View Solution",
+                isSolution: true,
+                emptyMessage: "No previous solution records matching your exact problem symptoms found yet.",
+                emptyFallback: "Campus members with matching technical skills can assist with troubleshooting.",
+              },
+              RESEARCH: {
+                title: "Relevant Research",
+                icon: BookOpen,
+                iconColor: "text-emerald-600",
+                iconBg: "bg-emerald-50",
+                items: matchingData.research,
+                hrefPrefix: "/research",
+                actionLabel: "View Paper",
+                emptyMessage: "No relevant research publications found.",
+                emptyFallback: "Faculty researchers and students with matching skills can offer guidance.",
+              },
+            };
+
+            const primaryCat = categoryMap[primaryType] || categoryMap.PEOPLE;
+
+            return (
+              <div className="space-y-10">
+                {/* 1. PRIMARY RESULT SECTION */}
+                <section>
+                  <SectionHeader
+                    icon={primaryCat.icon}
+                    iconColor={primaryCat.iconColor}
+                    iconBg={primaryCat.iconBg}
+                    title={primaryCat.title}
+                    count={primaryCat.items.length}
+                    badge="Primary Result"
+                    badgeColor="bg-blue-600 text-white border-blue-600 shadow-sm"
+                  />
+                  {primaryCat.items.length === 0 ? (
+                    <div className="p-6 bg-white border border-slate-200 rounded-2xl shadow-card mt-4 space-y-1.5 text-center">
+                      <p className="text-sm font-bold text-slate-800">{primaryCat.emptyMessage}</p>
+                      <p className="text-xs text-slate-500">{primaryCat.emptyFallback}</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-4">
+                      {primaryCat.items.map((item) => (
+                        <CandidateCard
+                          key={item.candidate_id}
+                          item={item}
+                          href={`${primaryCat.hrefPrefix}${item.candidate_id}`}
+                          actionLabel={primaryCat.actionLabel}
+                          isSolution={primaryCat.isSolution}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                {/* 2. HELP CHAIN (WHEN APPLICABLE) */}
+                {matchingData.help_chain && (
+                  <HelpChainSection helpChain={matchingData.help_chain} />
+                )}
+
+                {/* 3. SECONDARY RESULT SECTIONS (ONLY NON-EMPTY AND NON-EVIDENCE-ONLY) */}
+                {secondaryTypes.map((secType) => {
+                  if (secType === primaryType || evidenceOnlyTypes.has(secType)) {
+                    return null;
+                  }
+                  const secCat = categoryMap[secType];
+                  if (!secCat || secCat.items.length === 0) {
+                    return null; // Strict rule: never render empty secondary sections!
+                  }
+                  return (
+                    <section key={secType}>
+                      <SectionHeader
+                        icon={secCat.icon}
+                        iconColor={secCat.iconColor}
+                        iconBg={secCat.iconBg}
+                        title={secCat.title}
+                        count={secCat.items.length}
+                        badge="Supporting Context"
+                        badgeColor="bg-slate-100 text-slate-700 border-slate-200"
+                      />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-4">
+                        {secCat.items.map((item) => (
+                          <CandidateCard
+                            key={item.candidate_id}
+                            item={item}
+                            href={`${secCat.hrefPrefix}${item.candidate_id}`}
+                            actionLabel={secCat.actionLabel}
+                            isSolution={secCat.isSolution}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })}
               </div>
-            )}
-          </section>
-
-          {/* TOP PREVIOUS SOLUTIONS */}
-          <section>
-            <SectionHeader icon={Lightbulb} iconColor="text-orange-500" iconBg="bg-orange-50" title="Top Previous Solutions" count={matchingData.top_solutions.length} />
-            {matchingData.top_solutions.length === 0 ? (
-              <EmptyCategoryMessage message="No previous solution records matching your exact problem symptoms found yet." />
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-4">
-                {matchingData.top_solutions.map((item) => (
-                  <CandidateCard key={item.candidate_id} item={item} href={`/solutions`} actionLabel="View Solution" isSolution />
-                ))}
-              </div>
-            )}
-          </section>
-
-          {/* TOP PROJECTS */}
-          <section>
-            <SectionHeader icon={FolderGit2} iconColor="text-indigo-600" iconBg="bg-indigo-50" title="Top Projects" count={matchingData.top_projects.length} />
-            {matchingData.top_projects.length === 0 ? (
-              <EmptyCategoryMessage message="No matching campus projects indexed yet." />
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-4">
-                {matchingData.top_projects.map((item) => (
-                  <CandidateCard key={item.candidate_id} item={item} href={`/projects/${item.candidate_id}`} actionLabel="View Project" />
-                ))}
-              </div>
-            )}
-          </section>
-
-          {/* RELEVANT RESEARCH & FACILITIES */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <section>
-              <SectionHeader icon={BookOpen} iconColor="text-emerald-600" iconBg="bg-emerald-50" title="Relevant Research" count={matchingData.research.length} />
-              {matchingData.research.length === 0 ? (
-                <EmptyCategoryMessage message="No relevant research publications found." />
-              ) : (
-                <div className="space-y-4 mt-4">
-                  {matchingData.research.map((item) => (
-                    <CandidateCard key={item.candidate_id} item={item} href={`/research`} actionLabel="View Paper" />
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <section>
-              <SectionHeader icon={Building2} iconColor="text-purple-600" iconBg="bg-purple-50" title="Relevant Facilities & Hardware" count={matchingData.facilities.length} />
-              {matchingData.facilities.length === 0 ? (
-                <EmptyCategoryMessage message="No matching laboratories or hardware facilities found." />
-              ) : (
-                <div className="space-y-4 mt-4">
-                  {matchingData.facilities.map((item) => (
-                    <CandidateCard key={item.candidate_id} item={item} href={`/facilities/${item.candidate_id}`} actionLabel="View Facility" />
-                  ))}
-                </div>
-              )}
-            </section>
-          </div>
+            );
+          })()}
 
           {/* AGENT TRACE TOGGLE */}
           {matchingData.traces.length > 0 && (
@@ -496,6 +590,21 @@ function CandidateCard({ item, href, actionLabel, isSolution = false }: { item: 
         <p className="text-xs text-slate-700 leading-relaxed mb-3 bg-slate-50 p-3 rounded-xl border border-slate-100 font-normal">
           {item.explanation}
         </p>
+
+        {/* Similar Problem Solved highlight (for problem solving queries / person evidence) */}
+        {item.person_evidence_graph?.solutions && item.person_evidence_graph.solutions.length > 0 && (
+          <div className="mb-3 p-3 bg-orange-50/80 border border-orange-200/90 rounded-xl text-xs space-y-1">
+            <div className="flex items-center gap-1.5 font-bold text-orange-900 text-[11px] uppercase tracking-wider">
+              <Lightbulb className="w-3.5 h-3.5 text-orange-600" />
+              <span>Similar Problem Solved</span>
+            </div>
+            {item.person_evidence_graph.solutions.map((sol, idx) => (
+              <p key={idx} className="text-slate-800 font-semibold text-[12px] leading-snug">
+                "{sol.title}"
+              </p>
+            ))}
+          </div>
+        )}
 
         {/* Matched badges */}
         <div className="flex flex-wrap gap-1.5 mb-3.5">
@@ -706,7 +815,23 @@ function CandidateCard({ item, href, actionLabel, isSolution = false }: { item: 
   );
 }
 
-function SectionHeader({ icon: Icon, iconColor, iconBg, title, count }: { icon: any; iconColor: string; iconBg: string; title: string; count: number }) {
+function SectionHeader({
+  icon: Icon,
+  iconColor,
+  iconBg,
+  title,
+  count,
+  badge,
+  badgeColor,
+}: {
+  icon: any;
+  iconColor: string;
+  iconBg: string;
+  title: string;
+  count: number;
+  badge?: string;
+  badgeColor?: string;
+}) {
   return (
     <div className="flex items-center justify-between border-b border-slate-200 pb-3">
       <div className="flex items-center gap-2.5">
@@ -714,6 +839,11 @@ function SectionHeader({ icon: Icon, iconColor, iconBg, title, count }: { icon: 
           <Icon className={`w-4 h-4 ${iconColor}`} />
         </div>
         <h2 className="text-base font-extrabold text-slate-900">{title}</h2>
+        {badge && (
+          <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${badgeColor || "bg-blue-50 text-blue-700 border-blue-200"}`}>
+            {badge}
+          </span>
+        )}
       </div>
       <span className="px-2.5 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold">
         {count}

@@ -147,8 +147,6 @@ class PeopleDiscoveryAgent:
                         s for s in q_skills
                         if s.lower() in profile_skills or s.lower() in profile_text
                     ]
-                    if not matched_skills and profile_skills:
-                        matched_skills = [profile_info.get("skills", [])[0]] if profile_info.get("skills") else []
 
                     # Match query technologies
                     matched_tech = [

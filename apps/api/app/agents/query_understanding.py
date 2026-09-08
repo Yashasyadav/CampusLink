@@ -47,16 +47,60 @@ class QueryUnderstandingAgent:
                 result.problem_summary = query.strip()[:150]
             if not result.diagnostic_areas:
                 result.diagnostic_areas = [t for t in (result.technologies + result.skills)[:3]] or ["Technical Guidance"]
+            if result.resource_needs is None:
+                result.resource_needs = []
 
             return result
         except Exception as exc:
             logger.error(f"Query understanding parsing failed: {exc}")
-            # Fallback
+            # Heuristic fallback if LLM request fails (e.g. rate limit or network issue)
+            q_lower = query.lower()
+            fallback_domains = []
+            fallback_skills = []
+            fallback_tech = []
+            if "esp32" in q_lower:
+                fallback_tech.append("ESP32")
+                fallback_domains.append("Embedded Systems")
+            if "tinyml" in q_lower or "machine learning" in q_lower:
+                fallback_skills.append("TinyML")
+                fallback_domains.append("Machine Learning")
+            if "audio" in q_lower or "microphone" in q_lower:
+                fallback_domains.append("Audio Processing")
+            if "android" in q_lower:
+                fallback_skills.append("Android")
+                fallback_domains.append("Mobile Development")
+            if "firebase" in q_lower:
+                fallback_skills.append("Firebase")
+            if "vlsi" in q_lower:
+                fallback_domains.append("Electronics")
+
+            # Infer fallback intent and resources
+            fallback_intent = IntentEnum.GENERAL_CAMPUS_DISCOVERY
+            fallback_resources = []
+            if "lab" in q_lower or "equipment" in q_lower or "facility" in q_lower or "testing" in q_lower:
+                fallback_intent = IntentEnum.FIND_FACILITY
+                if "vlsi" in q_lower or "circuit" in q_lower:
+                    fallback_resources = ["VLSI Circuit Testing Equipment"]
+            elif "project" in q_lower or "built" in q_lower:
+                fallback_intent = IntentEnum.FIND_PROJECT
+            elif "research" in q_lower or "paper" in q_lower:
+                fallback_intent = IntentEnum.FIND_RESEARCH
+            elif "solved" in q_lower or "solution" in q_lower:
+                fallback_intent = IntentEnum.FIND_SIMILAR_SOLUTION
+            elif any(w in q_lower for w in ["working, but", "poor accuracy", "issue", "bug", "troubleshoot", "error"]):
+                fallback_intent = IntentEnum.FIND_EXPERTISE_AND_SIMILAR_SOLUTIONS
+            elif "who" in q_lower or "knows" in q_lower or "expert" in q_lower:
+                fallback_intent = IntentEnum.FIND_PERSON
+
             return QueryUnderstandingResult(
                 original_query=query.strip(),
                 problem_summary=query.strip()[:150],
+                domain=fallback_domains,
+                skills=fallback_skills,
+                technologies=fallback_tech,
                 diagnostic_areas=["Technical Investigation"],
-                intent=IntentEnum.GENERAL_CAMPUS_DISCOVERY,
+                resource_needs=fallback_resources,
+                intent=fallback_intent,
                 needs_people=True,
                 needs_projects=True,
                 needs_solutions=True,

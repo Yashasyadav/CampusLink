@@ -2,7 +2,13 @@ import uuid
 from enum import Enum
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
-from app.schemas.agents import QueryUnderstandingResult, DiscoveryResponse, AgentTrace
+from app.schemas.agents import (
+    QueryUnderstandingResult,
+    DiscoveryResponse,
+    AgentTrace,
+    ResultTypeEnum,
+    ResultComposition,
+)
 
 
 class HelpTypeEnum(str, Enum):
@@ -78,4 +84,5 @@ class MatchingAnalyzeResponse(BaseModel):
     facilities: List[MatchingResult] = Field(default=[], description="Ranked campus facility candidates")
     help_chain: Optional[HelpChain] = Field(default=None, description="Potential expertise chain analysis")
     traces: List[AgentTrace] = Field(default=[], description="Agent execution traces")
+    result_composition: Optional[ResultComposition] = Field(default=None, description="Intent-aware result composition configuration")
     metadata: Dict[str, Any] = Field(default={}, description="Processing status and candidate statistics")

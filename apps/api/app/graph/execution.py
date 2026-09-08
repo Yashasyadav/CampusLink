@@ -173,6 +173,9 @@ class GraphExecutionService:
             except Exception:
                 pass
 
+        from app.services.matching_service import determine_result_composition
+        result_comp = determine_result_composition(qu_result.intent)
+
         return DiscoveryResponse(
             query=original_query.strip(),
             query_understanding=qu_result,
@@ -182,4 +185,5 @@ class GraphExecutionService:
             evidence=evidence_list,
             status=state.get("status", "SUCCESS"),
             traces=traces_list,
+            result_composition=result_comp,
         )

@@ -2,7 +2,13 @@ import logging
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from app.models.users import User
-from app.schemas.agents import DiscoveryResponse, QueryUnderstandingResult
+from app.schemas.agents import (
+    DiscoveryResponse,
+    QueryUnderstandingResult,
+    IntentEnum,
+    ResultTypeEnum,
+    ResultComposition,
+)
 from app.schemas.matching import (
     MatchingResult,
     EvidenceItem,
@@ -18,6 +24,62 @@ logger = logging.getLogger(__name__)
 
 
 MIN_RELEVANCE_THRESHOLD = 0.25
+
+
+def determine_result_composition(intent: IntentEnum) -> ResultComposition:
+    """
+    Deterministically computes primary, secondary, and evidence-only knowledge types
+    based on the structured query intent.
+    """
+    if intent in (IntentEnum.FIND_FACILITY, IntentEnum.FIND_EQUIPMENT):
+        return ResultComposition(
+            primary_result_type=ResultTypeEnum.FACILITIES,
+            secondary_result_types=[ResultTypeEnum.PEOPLE],
+            evidence_only_types=[ResultTypeEnum.PROJECTS, ResultTypeEnum.SOLUTIONS, ResultTypeEnum.RESEARCH],
+        )
+    elif intent == IntentEnum.FIND_PROJECT:
+        return ResultComposition(
+            primary_result_type=ResultTypeEnum.PROJECTS,
+            secondary_result_types=[ResultTypeEnum.PEOPLE],
+            evidence_only_types=[ResultTypeEnum.RESEARCH, ResultTypeEnum.SOLUTIONS],
+        )
+    elif intent == IntentEnum.FIND_RESEARCH:
+        return ResultComposition(
+            primary_result_type=ResultTypeEnum.RESEARCH,
+            secondary_result_types=[ResultTypeEnum.PEOPLE],
+            evidence_only_types=[ResultTypeEnum.PROJECTS, ResultTypeEnum.SOLUTIONS],
+        )
+    elif intent == IntentEnum.FIND_SIMILAR_SOLUTION:
+        return ResultComposition(
+            primary_result_type=ResultTypeEnum.SOLUTIONS,
+            secondary_result_types=[ResultTypeEnum.PEOPLE, ResultTypeEnum.PROJECTS],
+            evidence_only_types=[ResultTypeEnum.RESEARCH],
+        )
+    elif intent == IntentEnum.FIND_EXPERTISE_AND_SIMILAR_SOLUTIONS:
+        # Problem solving query: People is primary, Help Chain alongside, solutions/projects/research are person evidence
+        return ResultComposition(
+            primary_result_type=ResultTypeEnum.PEOPLE,
+            secondary_result_types=[],
+            evidence_only_types=[ResultTypeEnum.SOLUTIONS, ResultTypeEnum.PROJECTS, ResultTypeEnum.RESEARCH],
+        )
+    elif intent == IntentEnum.FIND_PERSON:
+        return ResultComposition(
+            primary_result_type=ResultTypeEnum.PEOPLE,
+            secondary_result_types=[ResultTypeEnum.PROJECTS, ResultTypeEnum.RESEARCH, ResultTypeEnum.SOLUTIONS],
+            evidence_only_types=[],
+        )
+    else:
+        # GENERAL_CAMPUS_DISCOVERY / fallback
+        return ResultComposition(
+            primary_result_type=ResultTypeEnum.PEOPLE,
+            secondary_result_types=[
+                ResultTypeEnum.PROJECTS,
+                ResultTypeEnum.SOLUTIONS,
+                ResultTypeEnum.RESEARCH,
+                ResultTypeEnum.FACILITIES,
+            ],
+            evidence_only_types=[],
+        )
 
 
 class MatchingService:
@@ -75,8 +137,21 @@ class MatchingService:
 
                 q_tech_lower = {t.lower().strip() for t in q_tech if t.strip()}
                 matched_tech_list = [t for t in all_cand_tech if t.lower().strip() in q_tech_lower]
-                if not matched_tech_list:
-                    matched_tech_list = c_tech
+
+                # True intersection of candidate skills with query skills / keywords
+                q_skills_lower = {s.lower().strip() for s in q_skills if s.strip()}
+                q_terms = [term.lower().strip() for term in (qu.problem_keywords + qu.diagnostic_areas) if len(term.strip()) > 2]
+                all_cand_skills = list(c_skills) + ev_graph.get("skills", [])
+
+                matched_skills_list = []
+                seen_sk = set()
+                for s in all_cand_skills:
+                    s_clean = s.strip()
+                    s_low = s_clean.lower()
+                    if s_low in q_skills_lower or any(s_low == term or term in s_low for term in q_terms):
+                        if s_low not in seen_sk:
+                            seen_sk.add(s_low)
+                            matched_skills_list.append(s_clean)
 
                 has_proj = bool(ev_graph.get("projects")) or any(e.entity_type.upper() == "PROJECT" for e in cand.evidence)
                 has_sol = bool(ev_graph.get("solutions")) or any(e.entity_type.upper() == "PROBLEM_SOLUTION" for e in cand.evidence)
@@ -88,7 +163,7 @@ class MatchingService:
                 score, relevance_level, ev_strength, _ = self.scoring_service.calculate_score(
                     semantic_relevance=raw_score,
                     query_skills=q_skills,
-                    candidate_skills=c_skills,
+                    candidate_skills=all_cand_skills,
                     query_technologies=q_tech,
                     candidate_technologies=all_cand_tech,
                     has_project_evidence=has_proj,
@@ -114,7 +189,7 @@ class MatchingService:
                     candidate_type="PERSON",
                     relevance_score=score,
                     relevance_level=relevance_level,
-                    matched_skills=c_skills,
+                    matched_skills=matched_skills_list,
                     matched_technologies=matched_tech_list,
                     evidence_items=formatted_ev,
                 )
@@ -127,7 +202,7 @@ class MatchingService:
                         subtitle=cand.department or "Campus Member",
                         relevance_score=score,
                         relevance_level=relevance_level,
-                        matched_skills=c_skills,
+                        matched_skills=matched_skills_list,
                         matched_technologies=matched_tech_list,
                         matched_domains=q_domains,
                         supporting_evidence=formatted_ev,
@@ -149,8 +224,10 @@ class MatchingService:
             for proj in discovery.projects.projects:
                 proj_id = str(proj.get("id") or proj.get("project_id", ""))
                 title = proj.get("title", "Campus Project")
-                technologies = proj.get("technologies", [])
-                skills = proj.get("skills", [])
+                proj_meta = proj.get("metadata") or {}
+                technologies = proj.get("technologies") or proj_meta.get("technologies", [])
+                skills = proj.get("skills") or proj_meta.get("skills", [])
+                contributors = proj.get("contributors") or proj_meta.get("contributors", [])
                 score_raw = float(proj.get("score") or proj.get("relevance") or 0.50)
 
                 score, relevance_level, ev_strength, _ = self.scoring_service.calculate_score(
@@ -186,12 +263,17 @@ class MatchingService:
                     evidence_items=formatted_ev,
                 )
 
+                proj_strengths = list(strengths)
+                if contributors:
+                    proj_strengths.append(f"Contributors: {', '.join(contributors)}")
+                proj_subtitle = f"Contributors: {', '.join(contributors[:3])}" if contributors else (proj.get("domain") or "Campus Project")
+
                 top_projects.append(
                     MatchingResult(
                         candidate_id=proj_id,
                         candidate_type="PROJECT",
                         title=title,
-                        subtitle="Similar Campus Project",
+                        subtitle=proj_subtitle,
                         relevance_score=score,
                         relevance_level=relevance_level,
                         matched_skills=skills,
@@ -201,7 +283,7 @@ class MatchingService:
                         evidence_strength=ev_strength,
                         explanation=explanation,
                         help_type=help_type,
-                        strengths=strengths,
+                        strengths=proj_strengths,
                         limitations=limitations,
                     )
                 )
@@ -277,6 +359,8 @@ class MatchingService:
             for item in discovery.projects.research:
                 item_id = str(item.get("id") or item.get("research_id", ""))
                 title = item.get("title", "Campus Research Paper")
+                res_meta = item.get("metadata") or {}
+                authors = res_meta.get("authors", [])
                 score_raw = float(item.get("score") or item.get("relevance") or 0.50)
 
                 score, relevance_level, ev_strength, _ = self.scoring_service.calculate_score(
@@ -311,12 +395,17 @@ class MatchingService:
                     evidence_items=formatted_ev,
                 )
 
+                res_strengths = list(strengths)
+                if authors:
+                    res_strengths.append(f"Authors: {', '.join(authors)}")
+                res_subtitle = f"Authors: {', '.join(authors[:2])}" if authors else (item.get("publication_type") or "Campus Research Publication")
+
                 top_research.append(
                     MatchingResult(
                         candidate_id=item_id,
                         candidate_type="RESEARCH",
                         title=title,
-                        subtitle="Campus Research Publication",
+                        subtitle=res_subtitle,
                         relevance_score=score,
                         relevance_level=relevance_level,
                         matched_skills=[],
@@ -326,7 +415,7 @@ class MatchingService:
                         evidence_strength=ev_strength,
                         explanation=explanation,
                         help_type=help_type,
-                        strengths=strengths,
+                        strengths=res_strengths,
                         limitations=limitations,
                     )
                 )
@@ -341,6 +430,9 @@ class MatchingService:
                 fac_id = str(fac.get("id") or fac.get("facility_id", ""))
                 title = fac.get("name") or fac.get("title") or "Campus Laboratory"
                 dept = fac.get("department") or fac.get("location") or "Hardware Asset"
+                fac_meta = fac.get("metadata") or {}
+                eq_items = fac_meta.get("equipment", [])
+                resp_contact = fac_meta.get("responsible_user")
                 score_raw = float(fac.get("score") or fac.get("relevance") or 0.50)
 
                 score, relevance_level, ev_strength, _ = self.scoring_service.calculate_score(
@@ -375,12 +467,19 @@ class MatchingService:
                     evidence_items=formatted_ev,
                 )
 
+                fac_strengths = list(strengths)
+                if eq_items:
+                    fac_strengths.append(f"Equipment: {', '.join(eq_items[:4])}")
+                if resp_contact:
+                    fac_strengths.append(f"Contact: {resp_contact}")
+                fac_subtitle = f"Equipment: {', '.join(eq_items[:3])}" if eq_items else (dept or "Campus Laboratory")
+
                 top_facilities.append(
                     MatchingResult(
                         candidate_id=fac_id,
                         candidate_type="FACILITY",
                         title=title,
-                        subtitle=dept,
+                        subtitle=fac_subtitle,
                         relevance_score=score,
                         relevance_level=relevance_level,
                         matched_skills=[],
@@ -390,7 +489,7 @@ class MatchingService:
                         evidence_strength=ev_strength,
                         explanation=explanation,
                         help_type=help_type,
-                        strengths=strengths,
+                        strengths=fac_strengths,
                         limitations=limitations,
                     )
                 )
@@ -401,6 +500,7 @@ class MatchingService:
         help_chain = self.construct_help_chain(q_skills, q_tech, q_domains, top_people, top_projects)
 
         total_candidates = len(top_people) + len(top_projects) + len(top_solutions) + len(top_research) + len(top_facilities)
+        result_composition = determine_result_composition(qu.intent)
 
         return MatchingAnalyzeResponse(
             query=query,
@@ -412,6 +512,7 @@ class MatchingService:
             facilities=top_facilities,
             help_chain=help_chain,
             traces=discovery.traces,
+            result_composition=result_composition,
             metadata={
                 "candidate_count": total_candidates,
                 "processing_status": discovery.status,

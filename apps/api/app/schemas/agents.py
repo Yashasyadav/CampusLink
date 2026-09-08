@@ -32,11 +32,26 @@ class QueryUnderstandingResult(BaseModel):
     technologies: List[str] = Field(default=[], description="Extracted relevant technologies or hardware")
     diagnostic_areas: List[str] = Field(default=[], description="Extracted diagnostic sub-problems or investigation areas")
     problem_keywords: List[str] = Field(default=[], description="Extracted problem/symptom keywords")
+    resource_needs: List[str] = Field(default=[], description="Extracted campus resource or facility/equipment needs")
     intent: IntentEnum = Field(default=IntentEnum.GENERAL_CAMPUS_DISCOVERY, description="Structured query intent classification")
     needs_people: bool = Field(default=True, description="Whether people discovery agent should be invoked")
     needs_projects: bool = Field(default=True, description="Whether project/knowledge discovery agent should be invoked")
     needs_solutions: bool = Field(default=True, description="Whether problem/solution discovery agent should be invoked")
     needs_facilities: bool = Field(default=True, description="Whether facility discovery agent should be invoked")
+
+
+class ResultTypeEnum(str, Enum):
+    PEOPLE = "PEOPLE"
+    PROJECTS = "PROJECTS"
+    SOLUTIONS = "SOLUTIONS"
+    RESEARCH = "RESEARCH"
+    FACILITIES = "FACILITIES"
+
+
+class ResultComposition(BaseModel):
+    primary_result_type: ResultTypeEnum = Field(..., description="Directly requested primary knowledge type")
+    secondary_result_types: List[ResultTypeEnum] = Field(default=[], description="Contextual supporting knowledge types")
+    evidence_only_types: List[ResultTypeEnum] = Field(default=[], description="Types presented strictly as candidate evidence")
 
 
 class PeopleCandidate(BaseModel):
@@ -96,3 +111,4 @@ class DiscoveryResponse(BaseModel):
     evidence: List[Evidence] = Field(default=[], description="Aggregated evidence pointers across all agents")
     status: str = Field(default="SUCCESS", description="Overall execution status")
     traces: List[AgentTrace] = Field(default=[], description="Agent trace execution metadata")
+    result_composition: Optional[ResultComposition] = Field(default=None, description="Intent-aware result composition configuration")

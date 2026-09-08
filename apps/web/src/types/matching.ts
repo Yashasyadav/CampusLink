@@ -84,6 +84,14 @@ export interface HelpChain {
   is_single_candidate_sufficient: boolean;
 }
 
+export type ResultType = "PEOPLE" | "PROJECTS" | "SOLUTIONS" | "RESEARCH" | "FACILITIES";
+
+export interface ResultComposition {
+  primary_result_type: ResultType;
+  secondary_result_types: ResultType[];
+  evidence_only_types: ResultType[];
+}
+
 export interface QueryUnderstanding {
   original_query: string;
   problem_summary?: string;
@@ -92,6 +100,7 @@ export interface QueryUnderstanding {
   technologies: string[];
   diagnostic_areas?: string[];
   problem_keywords: string[];
+  resource_needs?: string[];
   intent: string;
   needs_people: boolean;
   needs_projects: boolean;
@@ -119,6 +128,7 @@ export interface MatchingAnalyzeResponse {
   facilities: MatchingResult[];
   help_chain?: HelpChain | null;
   traces: AgentTrace[];
+  result_composition?: ResultComposition | null;
   metadata: {
     candidate_count: number;
     processing_status: string;

@@ -273,6 +273,13 @@ class SearchService:
                 if not user_id or creator_id != user_id:
                     return None
 
+            tech_list = [t.technology_name for t in proj.technologies] if hasattr(proj, "technologies") and proj.technologies else []
+            contributors_list = []
+            if hasattr(proj, "contributors") and proj.contributors:
+                for c in proj.contributors:
+                    if c.user and hasattr(c.user, "profile") and c.user.profile and c.user.profile.searchable:
+                        contributors_list.append(c.user.profile.full_name)
+
             return SearchResultItem(
                 entity_type="PROJECT",
                 entity_id=entity_id,
@@ -283,6 +290,8 @@ class SearchService:
                     "status": proj.status.value if hasattr(proj.status, "value") else str(proj.status),
                     "project_type": proj.project_type.value if hasattr(proj.project_type, "value") else str(proj.project_type),
                     "visibility": vis,
+                    "technologies": tech_list,
+                    "contributors": contributors_list,
                 },
             )
 
@@ -297,6 +306,12 @@ class SearchService:
                 if not user_id or creator_id != user_id:
                     return None
 
+            authors_list = []
+            if hasattr(res, "authors") and res.authors:
+                for a in res.authors:
+                    if a.user and hasattr(a.user, "profile") and a.user.profile and a.user.profile.searchable:
+                        authors_list.append(a.user.profile.full_name)
+
             return SearchResultItem(
                 entity_type="RESEARCH",
                 entity_id=entity_id,
@@ -307,6 +322,7 @@ class SearchService:
                     "research_area": res.research_area,
                     "publication_type": res.publication_type.value if hasattr(res.publication_type, "value") else str(res.publication_type),
                     "visibility": vis,
+                    "authors": authors_list,
                 },
             )
 
@@ -319,6 +335,11 @@ class SearchService:
             if vis == "PRIVATE":
                 return None
 
+            eq_names = [e.name for e in fac.equipment] if hasattr(fac, "equipment") and fac.equipment else []
+            resp_name = None
+            if hasattr(fac, "responsible_user") and fac.responsible_user and hasattr(fac.responsible_user, "profile") and fac.responsible_user.profile and fac.responsible_user.profile.searchable:
+                resp_name = fac.responsible_user.profile.full_name
+
             return SearchResultItem(
                 entity_type="FACILITY",
                 entity_id=entity_id,
@@ -329,6 +350,8 @@ class SearchService:
                     "department": fac.department,
                     "location": fac.location,
                     "operating_hours": fac.operating_hours,
+                    "equipment": eq_names,
+                    "responsible_user": resp_name,
                 },
             )
 
